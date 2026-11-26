@@ -1,0 +1,34 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T141730Z-P03-e63a1790ec",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P03",
+  "created_at": "2026-11-26T14:17:30.839178Z",
+  "related_events": [
+    "E-20261126T100131Z-P01-5d48aece4f"
+  ],
+  "change_id": "C-P01-9833a373ea",
+  "verdict": "accept_with_changes",
+  "summary": "A 的模型與評分模組符合計畫第 4 節的匯出介面，只修改自己的目錄，沒有動共用契約；typecheck、20 項測試、build 在此 commit 通過，收合／展開（含巢狀）與存讀檔正常。有 3 項建議在最終 Demo 前修正（issues 1–3），並為它們補測試。本次審查由 Claude（AI）代 P03 讀 diff 與執行測試。",
+  "issues": [
+    "[1 需修正] 節點與 region 可以用同一個 id，importExternalGraph、loadSavedDocument、addNode 都不檢查。收合後可視圖有兩個同名節點，跨界連線變成 1->1，拖曳收合圓時實際移動的是同名狀態（graphModel.ts:90-99 先找 nodes）。region \"1\" 的 children 含節點 \"1\" 時還會誤報 Cyclic region hierarchy。建議三處都拒絕節點與 region 重複的 id，並在錯誤訊息指出是哪一個。",
+    "[2 需修正] moveNode 移動收合圓時不擴張父區域（graphModel.ts:98-106）。同一個目的地，移動一般狀態會把父框從 300x160 撐到 904x404，移動收合圓則父框不變，圓留在虛線框外。",
+    "[3 需修正] 交叉發生在轉折點或兩線重合處時不計入（metrics.ts:30-54 只認線段內部相交）。合成案例應為 1、回報 0。用 B 的 be7e44c 排版，high-crossing 的 LR 基準圖回報 29，但 e1/e7、e8/e14 在共用的垂直走道上交換上下順序，應為 31；該圖的最佳化結果不受影響。建議把重合或相接處視為一段接觸，比較進入前後位於對方哪一側。",
+    "[4 小] regions.children 裡寫錯的 id 會被靜默忽略（節點落在區域外）；同一節點列在兩個 region 時靜默取後者（serialization.ts:72-78）。建議拋錯，方便發現其他組資料的問題。",
+    "[建議] nodeOverlaps 只比節點對節點：兩個同層 region 疊在一起、外部狀態落在別的 region 框內都回報 0。若是刻意（計畫寫「同層或實體節點」）請註明。",
+    "[待確認] 端點是 region（複合狀態）的 transition 目前匯入直接報錯。其他組的資料若可能這樣給，需要決定處理方式。",
+    "[建議] moveNode 也接受收合中 region 的 id（C 的編輯器依賴此行為），請補進介面說明。"
+  ],
+  "tests_run": [
+    "npm run typecheck（f14e51c 的獨立副本）：通過",
+    "npm test：20 passed",
+    "npm run build：通過",
+    "臨時探測測試：重現 issues 1、2、3、4，以及端點為 region 時的錯誤",
+    "以 B 的 be7e44c 排版檢查 4 個 fixtures（LR、TB）的轉折點相接與線段重合"
+  ],
+  "inspected_commit": "f14e51c3c1dc1a5a06371d20517f00c64086afe1",
+  "evidence": [
+    "high-crossing LR 基準圖 e1：(60,25) (215,25) (215,255) (280,255) (280,325)；e7：(60,325) (215,325) (215,95) (280,95) (280,25)"
+  ]
+}
