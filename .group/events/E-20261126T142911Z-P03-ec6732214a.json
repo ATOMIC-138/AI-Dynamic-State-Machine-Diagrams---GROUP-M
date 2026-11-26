@@ -1,0 +1,34 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T142911Z-P03-ec6732214a",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P03",
+  "created_at": "2026-11-26T14:29:11.214093Z",
+  "related_events": [
+    "E-20261126T133307Z-P02-32c7e36e56"
+  ],
+  "change_id": "C-P02-b2157f3a70",
+  "verdict": "accept_with_changes",
+  "summary": "B 的排版引擎基礎扎實：匯出介面符合計畫第 4 節，只改自己的目錄；typecheck、7 項測試、build 在此 commit 通過。1500 張隨機圖（巢狀區域、自環、多重邊、LR/TB、不同間距）沒有節點或區域重疊、超出所屬區域、箭頭穿過其他節點，也沒有當掉；4 個 fixtures 的交叉數都沒有變差（high-crossing 31→1）。有 3 項建議在最終 Demo 前修正（issues 1–3），集中在回頭邊與收合後重排，並建議補對應測試。本次審查由 Claude（AI）代 P03 讀 diff 與執行測試。",
+  "issues": [
+    "[1 需修正] 回頭邊共用同一條外側通道，箭頭互相覆蓋，有的整條看不見。edgeRouting.ts:144-157 的通道位置只依同一組 (source,target) 的序號，不同的回頭邊落在同一條線上。重現：狀態 a,b,c，轉移 c>a,a>b,b>a,b>c,c>b,a>c，c→a 完全被 c→b 與 b→a 蓋住。10 個狀態／15 條轉移的 300 張隨機圖有 29 張出現整條被蓋住的箭頭（39 條中 38 條是回頭邊）。不符合計畫第 5 節「避免箭頭重疊」。建議每條回頭邊分配自己的通道與垂直段偏移。",
+    "[2 需修正] 有回頭邊時，最佳化後的交叉數比 baseline 多的情況明顯較常發生。6000 張隨機圖（以 A 最新的 0be5762 evaluateLayout 計算）：有回頭邊的 2114 張中 120 張變差（約 6%），沒有回頭邊的 3886 張只有 17 張（約 0.4%）。最小例子：n2>n3,n2>n0,n1>n2,n0>n3,n1>n0,n0>n2，baseline 1、最佳化 2。推測原因：排序時回頭邊以虛擬節點參與（sugiyama.ts:138-152），繪製時卻丟掉 guides 改走外側通道（edgeRouting.ts:144-157）。Demo 第 3 步直接顯示這個數字。建議讓排序模型與實際路由一致，並在最佳化結果較差時改用 baseline 的順序。",
+    "[3 需修正] 收合圓被拖動後再按 Auto Layout，圓保留拖動的相對位移（hierarchicalLayout.ts:152-156），可能跑到父區域外並蓋住狀態。重現：nested-regions 排版後收合 r_processing，把圓拖到 boot 上再重排：圓在 x=0，父區域 r_active 在 x 724–1852，可視圖 nodeOverlaps=1。建議重排時把收合圓放回區域中心（layout.test.ts:130 的斷言需一併調整）。",
+    "[4 小] 平行多重邊偶爾得到完全相同的路徑（2994 次中 5 次），直線被擋住改走繞道時偏移消失（edgeRouting.ts:158-172）。例：7 個狀態、轉移 n0>n5,n0>n2,n3>n5,n0>n5，兩條 n0→n5 的轉折點都是 (170,25),(170,275)。",
+    "[效能] 大圖會讓介面卡住（編輯器在主執行緒同步跑 baseline 與最佳化兩次排版）。實測：30 個狀態以內不到 40ms；100 個狀態／150 條轉移約 7 秒＋1 秒；150／220（10 個區域）約 19 秒＋25 秒。detour() 每次都用全部障礙物建格點（edgeRouting.ts:56-94），建議只取附近的障礙物。"
+  ],
+  "tests_run": [
+    "npm run typecheck（40982ec 的獨立副本）：通過",
+    "npm test：7 passed",
+    "npm run build：通過",
+    "1500 張隨機圖檢查重疊、包含關係、穿越、輸入不變、結果可重現：沒有違反（檢查器已用刻意做錯的圖確認會報錯）",
+    "13144 條箭頭沒有任何一條回頭穿過自己的起點或終點",
+    "搭配 A 的 model／metrics／fixtures 探測回頭邊、收合圓、多重邊與效能；引用的交叉數與收合圓結果已用 A 最新的 0be5762 重測"
+  ],
+  "inspected_commit": "40982ecdb34219517b0514d8cb1c6f2798fe856f",
+  "evidence": [
+    "issue 1 的 waypoints：c>a (576,75)(576,-8)(-16,-8)(-16,75)；c>b (576,75)(576,-8)(204,-8)(204,25)；b>a (356,25)(356,-8)(-16,-8)(-16,75)",
+    "4 個 fixtures（LR）baseline → 最佳化交叉數（A 的 0be5762）：linear 0→0、cycles 24→11、high-crossing 31→1、nested 2→1"
+  ]
+}
