@@ -2,7 +2,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { backend, isStubBackend } from './editor/backend';
 import { DiagramCanvas } from './editor/DiagramCanvas';
 import { openPreset, presets } from './editor/presets';
-import { openExternalGraph, openSavedDocument, runAutoLayout, type OpenedDocument } from './editor/session';
+import {
+  openExternalGraph,
+  openSavedDocument,
+  runAutoLayout,
+  trackLatestRequest,
+  type OpenedDocument,
+} from './editor/session';
 import { useDiagramInteraction } from './editor/useDiagramInteraction';
 import type { LayoutComparison, StateMachineDocument } from './types/graph';
 import { MetricsPanel } from './ui/MetricsPanel';
@@ -34,11 +40,24 @@ export function App() {
     }
   };
 
+  const [startOpenRequest] = useState(trackLatestRequest);
+
   const openFile = (action: string, file: File, parse: (text: string) => OpenedDocument) => {
+    // A file chosen earlier may finish reading later; it must not replace the newer choice.
+    const isLatest = startOpenRequest();
     file.text().then(
-      (text) => open(action, () => parse(text)),
-      (error: unknown) => fail(action, error),
+      (text) => {
+        if (isLatest()) open(action, () => parse(text));
+      },
+      (error: unknown) => {
+        if (isLatest()) fail(action, error);
+      },
     );
+  };
+
+  const loadPreset = (index: number) => {
+    startOpenRequest(); // any file still being read is now out of date
+    open('載入範例', () => openPreset(presets[index]));
   };
 
   const save = () => {
@@ -71,7 +90,7 @@ export function App() {
         presetNames={presets.map((preset) => preset.name)}
         hasDocument={doc !== null}
         mode={editor.mode}
-        onLoadPreset={(index) => open('載入範例', () => openPreset(presets[index]))}
+        onLoadPreset={loadPreset}
         onImportExternal={(file) => openFile('匯入外部 JSON', file, openExternalGraph)}
         onSave={save}
         onLoadSaved={(file) => openFile('載入儲存檔', file, openSavedDocument)}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clipToOutline,
+  contentBoxes,
   drawEdges,
   fitViewport,
   nearestSegmentIndex,
@@ -47,6 +48,28 @@ describe('viewport', () => {
   it('centers content and shrinks it to fit without enlarging it', () => {
     expect(fitViewport([{ x: 0, y: 0, width: 100, height: 100 }], 500, 300)).toEqual({ x: 200, y: 100, scale: 1 });
     expect(fitViewport([{ x: 0, y: 0, width: 808, height: 100 }], 500, 300).scale).toBe(0.5);
+  });
+
+  it('fits a bend that was dragged far outside every state', () => {
+    const graph = {
+      nodes: [box, { ...box, id: 'm', x: 480 }],
+      regions: [],
+      edges: [
+        {
+          id: 'e',
+          originalSource: 'n',
+          originalTarget: 'm',
+          displaySource: 'n',
+          displayTarget: 'm',
+          waypoints: [{ x: 300, y: -500 }],
+          isRedirected: false,
+        },
+      ],
+    };
+    const view = fitViewport(contentBoxes(graph), 600, 300);
+    const bendOnScreen = -500 * view.scale + view.y;
+    expect(bendOnScreen).toBeGreaterThanOrEqual(0);
+    expect(bendOnScreen).toBeLessThanOrEqual(300);
   });
 });
 

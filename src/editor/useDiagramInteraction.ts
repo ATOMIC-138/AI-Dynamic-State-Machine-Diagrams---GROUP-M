@@ -7,7 +7,15 @@ import type { Point, StateMachineDocument, VisibleGraph } from '../types/graph';
 import { backend } from './backend';
 import type { CanvasHandlers } from './DiagramCanvas';
 import { createState, createTransition, dragNode, insertAt, removeAt, replaceAt } from './editorActions';
-import { drawEdges, fitViewport, nearestSegmentIndex, screenToWorld, zoomAt, type Viewport } from './geometry';
+import {
+  contentBoxes,
+  drawEdges,
+  fitViewport,
+  nearestSegmentIndex,
+  screenToWorld,
+  zoomAt,
+  type Viewport,
+} from './geometry';
 
 export type Mode = 'select' | 'add-state' | 'add-transition';
 
@@ -62,8 +70,7 @@ export function useDiagramInteraction(
   const fitToView = useCallback((target: StateMachineDocument) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const visible = backend.projectVisibleGraph(target);
-    setViewport(fitViewport([...visible.nodes, ...visible.regions], rect.width, rect.height));
+    setViewport(fitViewport(contentBoxes(backend.projectVisibleGraph(target)), rect.width, rect.height));
   }, []);
 
   const deleteWaypoint = useCallback(

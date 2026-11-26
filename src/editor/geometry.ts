@@ -139,6 +139,12 @@ export function drawEdges(graph: VisibleGraph): DrawnEdge[] {
   });
 }
 
+/** Everything "fit to view" has to show: the shapes, and the arrows along the bends they are drawn with. */
+export function contentBoxes(graph: VisibleGraph): Box[] {
+  const arrows = drawEdges(graph).flatMap(({ points }) => points.map(({ x, y }) => ({ x, y, width: 0, height: 0 })));
+  return [...graph.nodes, ...graph.regions, ...arrows];
+}
+
 export function polylinePath(points: Point[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
 }

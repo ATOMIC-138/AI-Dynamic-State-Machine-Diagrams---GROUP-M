@@ -26,3 +26,15 @@ export function openExternalGraph(raw: string | ExternalGraphInput): OpenedDocum
 export function openSavedDocument(raw: string): OpenedDocument {
   return { doc: backend.loadSavedDocument(raw), comparison: null };
 }
+
+/**
+ * Files are read asynchronously and can finish in any order. Call the returned
+ * function once per open request; its check stays true only until a newer one.
+ */
+export function trackLatestRequest() {
+  let latest = 0;
+  return () => {
+    const request = ++latest;
+    return () => request === latest;
+  };
+}
