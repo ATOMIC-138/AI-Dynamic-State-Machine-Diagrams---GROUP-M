@@ -243,6 +243,131 @@ describe('Objective Layout Metrics Evaluator', () => {
 
     expect(evaluateLayout(doc).edgeCrossings).toBe(2);
   });
+
+  it('distinguishes shared-source collinear branches (0), same-side touch (0), and multi-segment side-swap overlap (1)', () => {
+    // 1) Shared-source collinear branching: e1 and e2 leave a1 along the same horizontal segment to (215, 25), then split up/down -> 0 crossings
+    const sharedSourceBranch: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'a1', x: 0, y: 0, width: 120, height: 50, regionId: null },
+        { id: 'b_up', x: 220, y: -100, width: 120, height: 50, regionId: null },
+        { id: 'b_down', x: 220, y: 100, width: 120, height: 50, regionId: null },
+      ],
+      edges: [
+        { id: 'e1', source: 'a1', target: 'b_up', waypoints: [{ x: 215, y: 25 }] },
+        { id: 'e2', source: 'a1', target: 'b_down', waypoints: [{ x: 215, y: 25 }] },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(sharedSourceBranch).edgeCrossings).toBe(0);
+
+    // 2) Same-side collinear touch (C-shapes touching along x=100, y in [50, 150] without swapping sides) -> 0 crossings
+    const sameSideTouch: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'p1', x: -10, y: -10, width: 20, height: 20, regionId: null },
+        { id: 'p2', x: -10, y: 190, width: 20, height: 20, regionId: null },
+        { id: 'q1', x: 190, y: 40, width: 20, height: 20, regionId: null },
+        { id: 'q2', x: 190, y: 140, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        {
+          id: 'ep',
+          source: 'p1',
+          target: 'p2',
+          waypoints: [
+            { x: 100, y: 0 },
+            { x: 100, y: 200 },
+          ],
+        },
+        {
+          id: 'eq',
+          source: 'q1',
+          target: 'q2',
+          waypoints: [
+            { x: 100, y: 50 },
+            { x: 100, y: 150 },
+          ],
+        },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(sameSideTouch).edgeCrossings).toBe(0);
+
+    // 3) Multi-segment contiguous overlap that swaps sides -> counted ONCE (1 crossing, not 2)
+    const multiSegSwap: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'p1', x: -10, y: -10, width: 20, height: 20, regionId: null },
+        { id: 'p2', x: 240, y: 90, width: 20, height: 20, regionId: null },
+        { id: 'q1', x: 90, y: -60, width: 20, height: 20, regionId: null },
+        { id: 'q2', x: 140, y: 190, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        {
+          id: 'ep',
+          source: 'p1',
+          target: 'p2',
+          waypoints: [
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 200, y: 100 },
+          ],
+        },
+        {
+          id: 'eq',
+          source: 'q1',
+          target: 'q2',
+          waypoints: [
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 200, y: 100 },
+          ],
+        },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(multiSegSwap).edgeCrossings).toBe(1);
+
+    // 4) Multi-segment contiguous overlap that stays on the SAME side -> 0 crossings
+    const multiSegSameSide: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'p1', x: -10, y: -10, width: 20, height: 20, regionId: null },
+        { id: 'p2', x: 190, y: 190, width: 20, height: 20, regionId: null },
+        { id: 'q1', x: 90, y: -60, width: 20, height: 20, regionId: null },
+        { id: 'q2', x: 240, y: 90, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        {
+          id: 'ep',
+          source: 'p1',
+          target: 'p2',
+          waypoints: [
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 200, y: 100 },
+          ],
+        },
+        {
+          id: 'eq',
+          source: 'q1',
+          target: 'q2',
+          waypoints: [
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 200, y: 100 },
+          ],
+        },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(multiSegSameSide).edgeCrossings).toBe(0);
+  });
 });
 
 describe('Benchmark & Demo Fixtures Validation', () => {

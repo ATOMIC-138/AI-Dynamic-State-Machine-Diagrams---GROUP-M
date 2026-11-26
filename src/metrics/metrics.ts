@@ -17,6 +17,10 @@ function cross(o: Point, a: Point, b: Point): number {
   return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
 
+function crossVec(u: Point, v: Point): number {
+  return u.x * v.y - u.y * v.x;
+}
+
 function dot(a: Point, b: Point): number {
   return a.x * b.x + a.y * b.y;
 }
@@ -128,7 +132,6 @@ function pointStrictlyOnSegment(p: Point, a: Point, b: Point): boolean {
   if (len <= EPS) {
     return false;
   }
-  // Perpendicular distance from p to line (a, b)
   const dist = Math.abs(cross(a, b, p)) / len;
   if (dist > EPS) {
     return false;
@@ -139,34 +142,88 @@ function pointStrictlyOnSegment(p: Point, a: Point, b: Point): boolean {
   return proj > EPS && proj < 1 - EPS;
 }
 
+interface CollinearOverlapInfo {
+  dir: 1 | -1;
+  unit: Point;
+  lenP: number;
+  tStart: number;
+  tEnd: number;
+  ta: number;
+  tb: number;
+  startPoint: Point;
+  endPoint: Point;
+}
+
 /**
- * Returns true if segments (a, b) and (c, d) are collinear and overlap with positive length.
+ * Checks whether segment (a -> b) and segment (c -> d) are collinear and overlap
+ * with strictly positive length. Aligns (c, d) in the same travel direction as (a -> b).
  */
-function segmentsCollinearOverlap(a: Point, b: Point, c: Point, d: Point): boolean {
-  const lenAB = segmentLength(a, b);
-  const lenCD = segmentLength(c, d);
-  if (lenAB <= EPS || lenCD <= EPS) {
-    return false;
+function getCollinearOverlap(
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+): CollinearOverlapInfo | null {
+  const lenP = segmentLength(a, b);
+  const lenQ = segmentLength(c, d);
+  if (lenP <= EPS || lenQ <= EPS) {
+    return null;
   }
 
-  if (Math.abs(cross(a, b, c)) / lenAB > EPS || Math.abs(cross(a, b, d)) / lenAB > EPS) {
-    return false;
+  if (Math.abs(cross(a, b, c)) / lenP > EPS || Math.abs(cross(a, b, d)) / lenP > EPS) {
+    return null;
   }
 
-  // Project onto unit direction of AB
-  const ux = (b.x - a.x) / lenAB;
-  const uy = (b.y - a.y) / lenAB;
-  const tc = (c.x - a.x) * ux + (c.y - a.y) * uy;
-  const td = (d.x - a.x) * ux + (d.y - a.y) * uy;
+  const unit = { x: (b.x - a.x) / lenP, y: (b.y - a.y) / lenP };
+  const tc = (c.x - a.x) * unit.x + (c.y - a.y) * unit.y;
+  const td = (d.x - a.x) * unit.x + (d.y - a.y) * unit.y;
 
-  const overlapStart = Math.max(0, Math.min(tc, td));
-  const overlapEnd = Math.min(lenAB, Math.max(tc, td));
-  return overlapEnd - overlapStart > EPS;
+  const dir: 1 | -1 = td > tc ? 1 : -1;
+  const ta = dir === 1 ? tc : td;
+  const tb = dir === 1 ? td : tc;
+
+  const tStart = Math.max(0, ta);
+  const tEnd = Math.min(lenP, tb);
+  if (tEnd - tStart <= EPS) {
+    return null;
+  }
+
+  return {
+    dir,
+    unit,
+    lenP,
+    tStart,
+    tEnd,
+    ta,
+    tb,
+    startPoint: { x: a.x + unit.x * tStart, y: a.y + unit.y * tStart },
+    endPoint: { x: a.x + unit.x * tEnd, y: a.y + unit.y * tEnd },
+  };
+}
+
+function unitVec(from: Point, to: Point): Point | null {
+  const len = segmentLength(from, to);
+  if (len <= EPS) {
+    return null;
+  }
+  return { x: (to.x - from.x) / len, y: (to.y - from.y) / len };
+}
+
+function sameDirection(u: Point, v: Point): boolean {
+  return Math.abs(crossVec(u, v)) <= EPS && dot(u, v) > 0;
+}
+
+/**
+ * Counter-clockwise angle in [0, 2*PI) from reference unit vector `ref` to vector `vec`.
+ */
+function ccwAngleFrom(ref: Point, vec: Point): number {
+  const angle = Math.atan2(crossVec(ref, vec), dot(ref, vec));
+  return angle < 0 ? angle + Math.PI * 2 : angle;
 }
 
 /**
  * Returns true if two paths meeting at a shared interior vertex W genuinely cross
- * (their incident ray directions alternate cyclically around W).
+ * (their incident ray directions alternate cyclically around W and no two rays coincide).
  */
 function raysAlternateAtVertex(
   w: Point,
@@ -175,28 +232,32 @@ function raysAlternateAtVertex(
   qPrev: Point,
   qNext: Point,
 ): boolean {
-  const normalizeAngle = (from: Point, to: Point) => {
-    const a = Math.atan2(to.y - from.y, to.x - from.x);
-    return a < 0 ? a + Math.PI * 2 : a;
-  };
-  const a1 = normalizeAngle(w, pPrev);
-  const a2 = normalizeAngle(w, pNext);
-  const b1 = normalizeAngle(w, qPrev);
-  const b2 = normalizeAngle(w, qNext);
+  const up1 = unitVec(w, pPrev);
+  const up2 = unitVec(w, pNext);
+  const uq1 = unitVec(w, qPrev);
+  const uq2 = unitVec(w, qNext);
+  if (!up1 || !up2 || !uq1 || !uq2) {
+    return false;
+  }
 
-  // If any ray coincides with another ray from the other polyline, collinear overlap handles it
-  const angleClose = (x: number, y: number) => {
-    const diff = Math.abs(x - y);
-    return Math.min(diff, Math.PI * 2 - diff) < 1e-3;
-  };
+  // If any ray coincides with a ray of the other polyline, collinear contact handling covers it.
   if (
-    angleClose(a1, b1) ||
-    angleClose(a1, b2) ||
-    angleClose(a2, b1) ||
-    angleClose(a2, b2)
+    sameDirection(up1, uq1) ||
+    sameDirection(up1, uq2) ||
+    sameDirection(up2, uq1) ||
+    sameDirection(up2, uq2)
   ) {
     return false;
   }
+
+  const normalizeAngle = (u: Point) => {
+    const a = Math.atan2(u.y, u.x);
+    return a < 0 ? a + Math.PI * 2 : a;
+  };
+  const a1 = normalizeAngle(up1);
+  const a2 = normalizeAngle(up2);
+  const b1 = normalizeAngle(uq1);
+  const b2 = normalizeAngle(uq2);
 
   const low = Math.min(a1, a2);
   const high = Math.max(a1, a2);
@@ -206,12 +267,170 @@ function raysAlternateAtVertex(
 }
 
 /**
- * Counts crossings and collinear segment overlaps between two distinct edge polylines.
+ * Counts crossings from maximal contiguous collinear overlap runs between P and Q.
+ *
+ * Rules:
+ * - A contiguous shared contact interval [S, E] (possibly spanning multiple shared segments)
+ *   is evaluated ONCE as a whole.
+ * - If [S, E] touches the start or end graph endpoint of EITHER P or Q (e.g. shared-source
+ *   branching or shared-target merging), it is NOT a crossing (0).
+ * - Otherwise, compare which side of P the polyline Q occupies immediately before S vs
+ *   immediately after E; count +1 ONLY if they genuinely swap sides.
+ */
+function countCollinearContactCrossings(P: Point[], Q: Point[]): number {
+  const pSegCount = P.length - 1;
+  const qSegCount = Q.length - 1;
+  const visited = new Set<string>();
+  let crossings = 0;
+
+  const keyOf = (i: number, j: number, dir: 1 | -1) => `${i}:${j}:${dir}`;
+
+  const alignedQSeg = (j: number, dir: 1 | -1): [Point, Point] =>
+    dir === 1 ? [Q[j], Q[j + 1]] : [Q[j + 1], Q[j]];
+
+  for (let i = 0; i < pSegCount; i++) {
+    for (let j = 0; j < qSegCount; j++) {
+      const base = getCollinearOverlap(P[i], P[i + 1], Q[j], Q[j + 1]);
+      if (!base) {
+        continue;
+      }
+      const dir = base.dir;
+      if (visited.has(keyOf(i, j, dir))) {
+        continue;
+      }
+
+      // Walk backwards to the beginning of this maximal contiguous shared contact run.
+      let i0 = i;
+      let j0 = j;
+      let startInfo = base;
+      while (
+        startInfo.tStart <= EPS &&
+        Math.abs(startInfo.ta) <= EPS &&
+        i0 > 0 &&
+        j0 - dir >= 0 &&
+        j0 - dir < qSegCount
+      ) {
+        const prevI = i0 - 1;
+        const prevJ = j0 - dir;
+        const prevInfo = getCollinearOverlap(P[prevI], P[prevI + 1], Q[prevJ], Q[prevJ + 1]);
+        if (
+          !prevInfo ||
+          prevInfo.dir !== dir ||
+          Math.abs(prevInfo.tEnd - prevInfo.lenP) > EPS ||
+          Math.abs(prevInfo.tb - prevInfo.lenP) > EPS
+        ) {
+          break;
+        }
+        i0 = prevI;
+        j0 = prevJ;
+        startInfo = prevInfo;
+      }
+
+      // Walk forwards to the end of this maximal contiguous shared contact run, marking all visited.
+      let i1 = i0;
+      let j1 = j0;
+      let endInfo = startInfo;
+      visited.add(keyOf(i1, j1, dir));
+      while (
+        Math.abs(endInfo.tEnd - endInfo.lenP) <= EPS &&
+        Math.abs(endInfo.tb - endInfo.lenP) <= EPS &&
+        i1 + 1 < pSegCount &&
+        j1 + dir >= 0 &&
+        j1 + dir < qSegCount
+      ) {
+        const nextI = i1 + 1;
+        const nextJ = j1 + dir;
+        const nextInfo = getCollinearOverlap(P[nextI], P[nextI + 1], Q[nextJ], Q[nextJ + 1]);
+        if (
+          !nextInfo ||
+          nextInfo.dir !== dir ||
+          nextInfo.tStart > EPS ||
+          Math.abs(nextInfo.ta) > EPS
+        ) {
+          break;
+        }
+        i1 = nextI;
+        j1 = nextJ;
+        endInfo = nextInfo;
+        visited.add(keyOf(i1, j1, dir));
+      }
+
+      const S = startInfo.startPoint;
+      const E = endInfo.endPoint;
+      const [qa0] = alignedQSeg(j0, dir);
+      const [, qb1] = alignedQSeg(j1, dir);
+
+      // 1. If contact touches either endpoint of P or Q, it is a branch/merge, not a crossing.
+      const touchesPEndpoint =
+        (i0 === 0 && pointsEqual(S, P[0])) ||
+        (i1 === pSegCount - 1 && pointsEqual(E, P[P.length - 1]));
+      const touchesQEndpoint =
+        (dir === 1 && j0 === 0 && pointsEqual(S, Q[0])) ||
+        (dir === -1 && j0 === qSegCount - 1 && pointsEqual(S, Q[Q.length - 1])) ||
+        (dir === 1 && j1 === qSegCount - 1 && pointsEqual(E, Q[Q.length - 1])) ||
+        (dir === -1 && j1 === 0 && pointsEqual(E, Q[0]));
+
+      if (touchesPEndpoint || touchesQEndpoint) {
+        continue;
+      }
+
+      // 2. Determine incoming points immediately before S along P and aligned Q.
+      const pPrev = pointsEqual(S, P[i0]) ? P[i0 - 1] : P[i0];
+      const qPrev = pointsEqual(S, qa0)
+        ? dir === 1
+          ? Q[j0 - 1]
+          : Q[j0 + 2]
+        : qa0;
+
+      // 3. Determine outgoing points immediately after E along P and aligned Q.
+      const pNext = pointsEqual(E, P[i1 + 1]) ? P[i1 + 2] : P[i1 + 1];
+      const qNext = pointsEqual(E, qb1)
+        ? dir === 1
+          ? Q[j1 + 2]
+          : Q[j1 - 1]
+        : qb1;
+
+      const vpIn = unitVec(S, pPrev);
+      const vqIn = unitVec(S, qPrev);
+      const vpOut = unitVec(E, pNext);
+      const vqOut = unitVec(E, qNext);
+      if (!vpIn || !vqIn || !vpOut || !vqOut) {
+        continue;
+      }
+
+      // Angle measured CCW from forward entry direction (+u_entry):
+      // angle(vpIn) > angle(vqIn) => Q is on +1 side of P before S; < => -1 side.
+      const anglePBefore = ccwAngleFrom(startInfo.unit, vpIn);
+      const angleQBefore = ccwAngleFrom(startInfo.unit, vqIn);
+      const diffBefore = anglePBefore - angleQBefore;
+
+      // Angle measured CCW from backward exit direction (-u_exit):
+      // angle(vqOut) > angle(vpOut) => Q is on +1 side of P after E; < => -1 side.
+      const negExitUnit = { x: -endInfo.unit.x, y: -endInfo.unit.y };
+      const anglePAfter = ccwAngleFrom(negExitUnit, vpOut);
+      const angleQAfter = ccwAngleFrom(negExitUnit, vqOut);
+      const diffAfter = angleQAfter - anglePAfter;
+
+      if (
+        (diffBefore > EPS && diffAfter < -EPS) ||
+        (diffBefore < -EPS && diffAfter > EPS)
+      ) {
+        crossings++;
+      }
+    }
+  }
+
+  return crossings;
+}
+
+/**
+ * Counts crossings between two distinct edge polylines.
  * Handles:
  * 1. Proper interior-to-interior segment intersections.
  * 2. One edge crossing directly through an interior bend waypoint of the other.
  * 3. Two edges crossing through a shared interior waypoint.
- * 4. Positive-length collinear overlapping segments between distinct edges.
+ * 4. Maximal contiguous collinear contact intervals that genuinely swap sides
+ *    (excluding shared-endpoint branches/merges and same-side touches).
  */
 function countPolylineCrossings(rawP: Point[], rawQ: Point[]): number {
   const P = simplifyPolyline(rawP);
@@ -222,13 +441,10 @@ function countPolylineCrossings(rawP: Point[], rawQ: Point[]): number {
 
   let count = 0;
 
-  // 1 & 4. Segment-pair proper intersections and positive-length collinear overlaps
+  // 1. Segment-pair proper intersections
   for (let i = 0; i < P.length - 1; i++) {
     for (let j = 0; j < Q.length - 1; j++) {
-      if (
-        segmentsProperlyIntersect(P[i], P[i + 1], Q[j], Q[j + 1]) ||
-        segmentsCollinearOverlap(P[i], P[i + 1], Q[j], Q[j + 1])
-      ) {
+      if (segmentsProperlyIntersect(P[i], P[i + 1], Q[j], Q[j + 1])) {
         count++;
       }
     }
@@ -260,7 +476,7 @@ function countPolylineCrossings(rawP: Point[], rawQ: Point[]): number {
     }
   }
 
-  // 3. Shared interior waypoint between P and Q
+  // 3. Shared interior waypoint between P and Q (no coincident rays)
   for (let i = 1; i < P.length - 1; i++) {
     for (let j = 1; j < Q.length - 1; j++) {
       if (
@@ -271,6 +487,9 @@ function countPolylineCrossings(rawP: Point[], rawQ: Point[]): number {
       }
     }
   }
+
+  // 4. Contiguous collinear contact intervals that swap sides
+  count += countCollinearContactCrossings(P, Q);
 
   return count;
 }
