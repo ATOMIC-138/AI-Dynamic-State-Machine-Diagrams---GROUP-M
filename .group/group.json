@@ -1,0 +1,13 @@
+{
+  "protocol_version": "0.1",
+  "group_id": "GROUP-M",
+  "canonical_branch": "main",
+  "assignment_file": ".group/assignment/assignment.md",
+  "remote": "origin",
+  "validation_commands": [
+    [
+      "{python}",
+      "scripts/run_checks.py"
+    ]
+  ]
+}
