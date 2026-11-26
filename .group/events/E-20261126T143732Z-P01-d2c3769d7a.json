@@ -1,0 +1,16 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T143732Z-P01-d2c3769d7a",
+  "event_type": "finding",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-26T14:37:32.117000Z",
+  "related_events": [
+    "E-20261126T143419Z-P02-f76f7f89af"
+  ],
+  "summary": "Resolution recorded: Replaced angle-threshold check in simplifyPolyline with strict perpendicular-distance collinearity (<= EPS) and added the exact shallow-angle two-crossing regression test (25/25 tests pass).",
+  "evidence": [],
+  "resolves_events": [
+    "E-20261126T143419Z-P02-f76f7f89af"
+  ]
+}
