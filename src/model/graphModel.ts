@@ -31,16 +31,20 @@ function cloneDocument(doc: StateMachineDocument): StateMachineDocument {
 }
 
 /**
- * Expands ancestor regions just enough to keep a moved node inside them,
- * without touching any other node's coordinates.
+ * Expands ancestor regions just enough to keep a moved node or collapsed child circle
+ * inside them, without touching any other node's coordinates.
  */
-function ensureEnclosingRegions(doc: StateMachineDocument, node: StateNode): void {
+function ensureEnclosingRegions(
+  doc: StateMachineDocument,
+  startRegionId: string | null,
+  bounds: { x: number; y: number; width: number; height: number },
+): void {
   const regionMap = new Map<string, RegionNode>(doc.regions.map((r) => [r.id, r]));
-  let currentId = node.regionId;
-  let childMinX = node.x;
-  let childMinY = node.y;
-  let childMaxX = node.x + node.width;
-  let childMaxY = node.y + node.height;
+  let currentId = startRegionId;
+  let childMinX = bounds.x;
+  let childMinY = bounds.y;
+  let childMaxX = bounds.x + bounds.width;
+  let childMaxY = bounds.y + bounds.height;
 
   const visited = new Set<string>();
   while (currentId && !visited.has(currentId)) {
@@ -91,7 +95,7 @@ export function moveNode(
   if (target) {
     target.x = x;
     target.y = y;
-    ensureEnclosingRegions(next, target);
+    ensureEnclosingRegions(next, target.regionId, target);
     return next;
   }
 
@@ -102,6 +106,12 @@ export function moveNode(
       x: x + radius,
       y: y + radius,
     };
+    ensureEnclosingRegions(next, collapsedRegion.parentId, {
+      x,
+      y,
+      width: radius * 2,
+      height: radius * 2,
+    });
     return next;
   }
 
@@ -135,6 +145,9 @@ export function addNode(
   if (doc.nodes.some((n) => n.id === node.id)) {
     throw new Error(`Duplicate node id: ${node.id}`);
   }
+  if (doc.regions.some((r) => r.id === node.id)) {
+    throw new Error(`Node id collides with existing region id: ${node.id}`);
+  }
   if (node.regionId !== null && !doc.regions.some((r) => r.id === node.regionId)) {
     throw new Error(`Region not found for node ${node.id}: ${node.regionId}`);
   }
@@ -144,7 +157,7 @@ export function addNode(
     isUserCreated: true,
   };
   next.nodes.push(created);
-  ensureEnclosingRegions(next, created);
+  ensureEnclosingRegions(next, created.regionId, created);
   return next;
 }
 

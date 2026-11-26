@@ -134,6 +134,82 @@ describe('Objective Layout Metrics Evaluator', () => {
     expect(metrics.edgeCrossings).toBe(2);
     expect(metrics.totalBends).toBe(2);
   });
+
+  it('counts crossings that occur directly on an interior waypoint, shared waypoint, or collinear overlap', () => {
+    // 1) Crossing directly through a bend waypoint
+    const waypointCrossDoc: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'a', x: 0, y: 0, width: 20, height: 20, regionId: null },
+        { id: 'b', x: 200, y: 200, width: 20, height: 20, regionId: null },
+        { id: 'c', x: 0, y: 100, width: 20, height: 20, regionId: null },
+        { id: 'd', x: 200, y: 100, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        // Straight horizontal at y = 110
+        { id: 'e_horiz', source: 'c', target: 'd', waypoints: [] },
+        // Bends right on (100, 110) and continues to opposite side
+        { id: 'e_bend', source: 'a', target: 'b', waypoints: [{ x: 100, y: 110 }] },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(waypointCrossDoc).edgeCrossings).toBe(1);
+
+    // 2) Two edges sharing a collinear channel overlap (reproducing high-crossing e1 vs e7)
+    const collinearOverlapDoc: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'a1', x: 0, y: 0, width: 120, height: 50, regionId: null },
+        { id: 'a4', x: 0, y: 300, width: 120, height: 50, regionId: null },
+        { id: 'b1', x: 220, y: 0, width: 120, height: 50, regionId: null },
+        { id: 'b4', x: 220, y: 300, width: 120, height: 50, regionId: null },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          source: 'a1',
+          target: 'b4',
+          waypoints: [
+            { x: 215, y: 25 },
+            { x: 215, y: 255 },
+            { x: 280, y: 255 },
+          ],
+        },
+        {
+          id: 'e7',
+          source: 'a4',
+          target: 'b1',
+          waypoints: [
+            { x: 215, y: 325 },
+            { x: 215, y: 95 },
+            { x: 280, y: 95 },
+          ],
+        },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(collinearOverlapDoc).edgeCrossings).toBe(1);
+
+    // 3) Shared interior waypoint where paths alternate cyclically
+    const sharedWpDoc: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'n1', x: 0, y: 0, width: 20, height: 20, regionId: null },
+        { id: 'n2', x: 200, y: 200, width: 20, height: 20, regionId: null },
+        { id: 'n3', x: 0, y: 200, width: 20, height: 20, regionId: null },
+        { id: 'n4', x: 200, y: 0, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        { id: 'e1', source: 'n1', target: 'n2', waypoints: [{ x: 110, y: 90 }] },
+        { id: 'e2', source: 'n3', target: 'n4', waypoints: [{ x: 110, y: 90 }] },
+      ],
+      regions: [],
+    };
+    expect(evaluateLayout(sharedWpDoc).edgeCrossings).toBe(1);
+  });
 });
 
 describe('Benchmark & Demo Fixtures Validation', () => {

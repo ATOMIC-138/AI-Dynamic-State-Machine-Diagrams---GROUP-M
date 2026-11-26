@@ -310,4 +310,53 @@ describe('Serialization (Import External & Save/Load without Auto-Relayout)', ()
     });
     expect(mixed.edges.map((e) => e.id)).toEqual(['e_2', 'e_1']);
   });
+
+  it('rejects node IDs that collide with region IDs across import, load, and addNode', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 'dup_1' }],
+        edges: [],
+        regions: [{ id: 'dup_1', parent: null }],
+      }),
+    ).toThrow(/collides with region id/);
+
+    expect(() =>
+      loadSavedDocument({
+        schemaVersion: '1.0',
+        layoutApplied: true,
+        nodes: [{ id: 'dup_1', x: 0, y: 0, width: 100, height: 50, regionId: null }],
+        edges: [],
+        regions: [{ id: 'dup_1', parentId: null, x: 0, y: 0, width: 200, height: 150, collapsed: false }],
+      }),
+    ).toThrow(/collides with region id/);
+
+    const doc = createNestedLaidOutDoc();
+    expect(() =>
+      addNode(doc, {
+        id: 'r_inner',
+        label: 'CollidingState',
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 50,
+        regionId: null,
+      }),
+    ).toThrow(/collides with existing region id/);
+  });
+
+  it('expands parent region boundary when dragging a collapsed child region circle outside it', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsed = toggleRegionCollapse(orig, 'r_inner', true);
+    // Drag r_inner circle far right/down past r_outer's original right (720) and bottom (200)
+    const moved = moveNode(collapsed, 'r_inner', 700, 220);
+
+    const outer = moved.regions.find((r) => r.id === 'r_outer')!;
+    const circleRight = 700 + 72; // default radius 36 -> diameter 72
+    const circleBottom = 220 + 72;
+    expect(outer.x + outer.width).toBeGreaterThanOrEqual(circleRight + 24);
+    expect(outer.y + outer.height).toBeGreaterThanOrEqual(circleBottom + 24);
+    // Other nodes remain strictly untouched
+    expect(moved.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 20, y: 100 });
+    expect(moved.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+  });
 });

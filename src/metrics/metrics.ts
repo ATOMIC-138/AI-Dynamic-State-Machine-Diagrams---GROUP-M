@@ -9,12 +9,6 @@ import type {
 
 const EPS = 1e-6;
 
-interface EdgeSegment {
-  edgeId: string;
-  p1: Point;
-  p2: Point;
-}
-
 function pointsEqual(a: Point, b: Point): boolean {
   return Math.abs(a.x - b.x) <= EPS && Math.abs(a.y - b.y) <= EPS;
 }
@@ -23,34 +17,8 @@ function cross(o: Point, a: Point, b: Point): number {
   return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 }
 
-/**
- * Returns true if open segments (a, b) and (c, d) strictly intersect at an interior point.
- * Shared endpoints are NOT counted as crossings.
- */
-function segmentsProperlyIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
-  if (pointsEqual(a, c) || pointsEqual(a, d) || pointsEqual(b, c) || pointsEqual(b, d)) {
-    return false;
-  }
-
-  // Quick AABB rejection
-  if (
-    Math.max(a.x, b.x) < Math.min(c.x, d.x) - EPS ||
-    Math.max(c.x, d.x) < Math.min(a.x, b.x) - EPS ||
-    Math.max(a.y, b.y) < Math.min(c.y, d.y) - EPS ||
-    Math.max(c.y, d.y) < Math.min(a.y, b.y) - EPS
-  ) {
-    return false;
-  }
-
-  const o1 = cross(a, b, c);
-  const o2 = cross(a, b, d);
-  const o3 = cross(c, d, a);
-  const o4 = cross(c, d, b);
-
-  return (
-    ((o1 > EPS && o2 < -EPS) || (o1 < -EPS && o2 > EPS)) &&
-    ((o3 > EPS && o4 < -EPS) || (o3 < -EPS && o4 > EPS))
-  );
+function dot(a: Point, b: Point): number {
+  return a.x * b.x + a.y * b.y;
 }
 
 function nodeCenter(node: VisibleNode): Point {
@@ -72,6 +40,224 @@ function isNonCollinearBend(prev: Point, curr: Point, next: Point): boolean {
   }
   const sinAngle = Math.abs(cross(prev, curr, next)) / (len1 * len2);
   return sinAngle > 1e-3;
+}
+
+/**
+ * Simplifies a polyline by removing duplicate adjacent points and intermediate
+ * collinear points (preserving endpoints), so each consecutive pair forms a
+ * maximal straight run for crossing analysis.
+ */
+function simplifyPolyline(points: Point[]): Point[] {
+  const deduped: Point[] = [];
+  for (const p of points) {
+    if (deduped.length === 0 || !pointsEqual(deduped[deduped.length - 1], p)) {
+      deduped.push(p);
+    }
+  }
+  if (deduped.length <= 2) {
+    return deduped;
+  }
+
+  const simplified: Point[] = [deduped[0]];
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const prev = simplified[simplified.length - 1];
+    const curr = deduped[i];
+    const next = deduped[i + 1];
+    // Keep only non-collinear bends or 180-degree reversals
+    const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+    if (isNonCollinearBend(prev, curr, next) || dot(v1, v2) < -EPS) {
+      simplified.push(curr);
+    }
+  }
+  simplified.push(deduped[deduped.length - 1]);
+  return simplified;
+}
+
+/**
+ * Returns true if open segments (a, b) and (c, d) strictly intersect at an interior point.
+ */
+function segmentsProperlyIntersect(a: Point, b: Point, c: Point, d: Point): boolean {
+  if (pointsEqual(a, c) || pointsEqual(a, d) || pointsEqual(b, c) || pointsEqual(b, d)) {
+    return false;
+  }
+
+  if (
+    Math.max(a.x, b.x) < Math.min(c.x, d.x) - EPS ||
+    Math.max(c.x, d.x) < Math.min(a.x, b.x) - EPS ||
+    Math.max(a.y, b.y) < Math.min(c.y, d.y) - EPS ||
+    Math.max(c.y, d.y) < Math.min(a.y, b.y) - EPS
+  ) {
+    return false;
+  }
+
+  const o1 = cross(a, b, c);
+  const o2 = cross(a, b, d);
+  const o3 = cross(c, d, a);
+  const o4 = cross(c, d, b);
+
+  return (
+    ((o1 > EPS && o2 < -EPS) || (o1 < -EPS && o2 > EPS)) &&
+    ((o3 > EPS && o4 < -EPS) || (o3 < -EPS && o4 > EPS))
+  );
+}
+
+/**
+ * Returns true if point p lies strictly inside open segment (a, b).
+ */
+function pointStrictlyOnSegment(p: Point, a: Point, b: Point): boolean {
+  if (pointsEqual(p, a) || pointsEqual(p, b)) {
+    return false;
+  }
+  const len = segmentLength(a, b);
+  if (len <= EPS) {
+    return false;
+  }
+  // Perpendicular distance from p to line (a, b)
+  const dist = Math.abs(cross(a, b, p)) / len;
+  if (dist > EPS) {
+    return false;
+  }
+  const ap = { x: p.x - a.x, y: p.y - a.y };
+  const ab = { x: b.x - a.x, y: b.y - a.y };
+  const proj = dot(ap, ab) / (len * len);
+  return proj > EPS && proj < 1 - EPS;
+}
+
+/**
+ * Returns true if segments (a, b) and (c, d) are collinear and overlap with positive length.
+ */
+function segmentsCollinearOverlap(a: Point, b: Point, c: Point, d: Point): boolean {
+  const lenAB = segmentLength(a, b);
+  const lenCD = segmentLength(c, d);
+  if (lenAB <= EPS || lenCD <= EPS) {
+    return false;
+  }
+
+  if (Math.abs(cross(a, b, c)) / lenAB > EPS || Math.abs(cross(a, b, d)) / lenAB > EPS) {
+    return false;
+  }
+
+  // Project onto unit direction of AB
+  const ux = (b.x - a.x) / lenAB;
+  const uy = (b.y - a.y) / lenAB;
+  const tc = (c.x - a.x) * ux + (c.y - a.y) * uy;
+  const td = (d.x - a.x) * ux + (d.y - a.y) * uy;
+
+  const overlapStart = Math.max(0, Math.min(tc, td));
+  const overlapEnd = Math.min(lenAB, Math.max(tc, td));
+  return overlapEnd - overlapStart > EPS;
+}
+
+/**
+ * Returns true if two paths meeting at a shared interior vertex W genuinely cross
+ * (their incident ray directions alternate cyclically around W).
+ */
+function raysAlternateAtVertex(
+  w: Point,
+  pPrev: Point,
+  pNext: Point,
+  qPrev: Point,
+  qNext: Point,
+): boolean {
+  const normalizeAngle = (from: Point, to: Point) => {
+    const a = Math.atan2(to.y - from.y, to.x - from.x);
+    return a < 0 ? a + Math.PI * 2 : a;
+  };
+  const a1 = normalizeAngle(w, pPrev);
+  const a2 = normalizeAngle(w, pNext);
+  const b1 = normalizeAngle(w, qPrev);
+  const b2 = normalizeAngle(w, qNext);
+
+  // If any ray coincides with another ray from the other polyline, collinear overlap handles it
+  const angleClose = (x: number, y: number) => {
+    const diff = Math.abs(x - y);
+    return Math.min(diff, Math.PI * 2 - diff) < 1e-3;
+  };
+  if (
+    angleClose(a1, b1) ||
+    angleClose(a1, b2) ||
+    angleClose(a2, b1) ||
+    angleClose(a2, b2)
+  ) {
+    return false;
+  }
+
+  const low = Math.min(a1, a2);
+  const high = Math.max(a1, a2);
+  const b1Between = b1 > low && b1 < high;
+  const b2Between = b2 > low && b2 < high;
+  return b1Between !== b2Between;
+}
+
+/**
+ * Counts crossings and collinear segment overlaps between two distinct edge polylines.
+ * Handles:
+ * 1. Proper interior-to-interior segment intersections.
+ * 2. One edge crossing directly through an interior bend waypoint of the other.
+ * 3. Two edges crossing through a shared interior waypoint.
+ * 4. Positive-length collinear overlapping segments between distinct edges.
+ */
+function countPolylineCrossings(rawP: Point[], rawQ: Point[]): number {
+  const P = simplifyPolyline(rawP);
+  const Q = simplifyPolyline(rawQ);
+  if (P.length < 2 || Q.length < 2) {
+    return 0;
+  }
+
+  let count = 0;
+
+  // 1 & 4. Segment-pair proper intersections and positive-length collinear overlaps
+  for (let i = 0; i < P.length - 1; i++) {
+    for (let j = 0; j < Q.length - 1; j++) {
+      if (
+        segmentsProperlyIntersect(P[i], P[i + 1], Q[j], Q[j + 1]) ||
+        segmentsCollinearOverlap(P[i], P[i + 1], Q[j], Q[j + 1])
+      ) {
+        count++;
+      }
+    }
+  }
+
+  // 2a. Interior waypoint of P strictly on a segment of Q (crossing to opposite side)
+  for (let i = 1; i < P.length - 1; i++) {
+    for (let j = 0; j < Q.length - 1; j++) {
+      if (pointStrictlyOnSegment(P[i], Q[j], Q[j + 1])) {
+        const oPrev = cross(Q[j], Q[j + 1], P[i - 1]);
+        const oNext = cross(Q[j], Q[j + 1], P[i + 1]);
+        if ((oPrev > EPS && oNext < -EPS) || (oPrev < -EPS && oNext > EPS)) {
+          count++;
+        }
+      }
+    }
+  }
+
+  // 2b. Interior waypoint of Q strictly on a segment of P (crossing to opposite side)
+  for (let j = 1; j < Q.length - 1; j++) {
+    for (let i = 0; i < P.length - 1; i++) {
+      if (pointStrictlyOnSegment(Q[j], P[i], P[i + 1])) {
+        const oPrev = cross(P[i], P[i + 1], Q[j - 1]);
+        const oNext = cross(P[i], P[i + 1], Q[j + 1]);
+        if ((oPrev > EPS && oNext < -EPS) || (oPrev < -EPS && oNext > EPS)) {
+          count++;
+        }
+      }
+    }
+  }
+
+  // 3. Shared interior waypoint between P and Q
+  for (let i = 1; i < P.length - 1; i++) {
+    for (let j = 1; j < Q.length - 1; j++) {
+      if (
+        pointsEqual(P[i], Q[j]) &&
+        raysAlternateAtVertex(P[i], P[i - 1], P[i + 1], Q[j - 1], Q[j + 1])
+      ) {
+        count++;
+      }
+    }
+  }
+
+  return count;
 }
 
 function nodesOverlap(a: VisibleNode, b: VisibleNode): boolean {
@@ -101,8 +287,8 @@ export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
     }
   }
 
-  // 2. Build edge polylines, compute totalEdgeLength, totalBends, and collect segments
-  const segments: EdgeSegment[] = [];
+  // 2. Build edge polylines, compute totalEdgeLength and totalBends
+  const polylines: Point[][] = [];
   let totalEdgeLength = 0;
   let totalBends = 0;
 
@@ -150,13 +336,7 @@ export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
     }
 
     for (let i = 0; i < polyline.length - 1; i++) {
-      const p1 = polyline[i];
-      const p2 = polyline[i + 1];
-      const len = segmentLength(p1, p2);
-      totalEdgeLength += len;
-      if (len > EPS) {
-        segments.push({ edgeId: edge.id, p1, p2 });
-      }
+      totalEdgeLength += segmentLength(polyline[i], polyline[i + 1]);
     }
 
     for (let i = 1; i < polyline.length - 1; i++) {
@@ -164,25 +344,15 @@ export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
         totalBends++;
       }
     }
+
+    polylines.push(polyline);
   }
 
-  // 3. Edge crossings (only between segments of distinct edges)
+  // 3. Edge crossings across all distinct edge pairs
   let edgeCrossings = 0;
-  for (let i = 0; i < segments.length; i++) {
-    for (let j = i + 1; j < segments.length; j++) {
-      if (segments[i].edgeId === segments[j].edgeId) {
-        continue;
-      }
-      if (
-        segmentsProperlyIntersect(
-          segments[i].p1,
-          segments[i].p2,
-          segments[j].p1,
-          segments[j].p2,
-        )
-      ) {
-        edgeCrossings++;
-      }
+  for (let i = 0; i < polylines.length; i++) {
+    for (let j = i + 1; j < polylines.length; j++) {
+      edgeCrossings += countPolylineCrossings(polylines[i], polylines[j]);
     }
   }
 

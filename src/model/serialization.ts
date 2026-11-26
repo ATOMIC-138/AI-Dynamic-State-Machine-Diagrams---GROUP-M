@@ -117,6 +117,9 @@ export function importExternalGraph(
     if (nodeIds.has(n.id)) {
       throw new Error(`Duplicate node id: ${n.id}`);
     }
+    if (regionIds.has(n.id)) {
+      throw new Error(`Node id collides with region id: ${n.id}`);
+    }
     nodeIds.add(n.id);
 
     const explicitRegion =
@@ -300,6 +303,9 @@ export function loadSavedDocument(rawJson: string | unknown): StateMachineDocume
     }
     if (nodeIds.has(n.id)) {
       throw new Error(`Duplicate node id: ${n.id}`);
+    }
+    if (regionIds.has(n.id)) {
+      throw new Error(`Node id collides with region id: ${n.id}`);
     }
     nodeIds.add(n.id);
 
