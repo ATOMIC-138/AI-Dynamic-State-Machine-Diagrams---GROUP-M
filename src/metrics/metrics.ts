@@ -43,9 +43,27 @@ function isNonCollinearBend(prev: Point, curr: Point, next: Point): boolean {
 }
 
 /**
- * Simplifies a polyline by removing duplicate adjacent points and intermediate
- * collinear points (preserving endpoints), so each consecutive pair forms a
- * maximal straight run for crossing analysis.
+ * Returns true if point curr is strictly collinear with prev -> next within EPS
+ * perpendicular distance and advances in the same direction (not a 180-degree reversal).
+ */
+function isStrictlyCollinearForward(prev: Point, curr: Point, next: Point): boolean {
+  const chordLen = segmentLength(prev, next);
+  if (chordLen <= EPS) {
+    return false;
+  }
+  const perpDist = Math.abs(cross(prev, next, curr)) / chordLen;
+  if (perpDist > EPS) {
+    return false;
+  }
+  const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
+  const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+  return dot(v1, v2) > EPS;
+}
+
+/**
+ * Simplifies a polyline by removing duplicate adjacent points and strictly collinear
+ * intermediate points (using perpendicular distance <= EPS, NOT the bend-angle threshold),
+ * so shallow-angle bends that deviate from a straight line are preserved for crossing detection.
  */
 function simplifyPolyline(points: Point[]): Point[] {
   const deduped: Point[] = [];
@@ -63,10 +81,7 @@ function simplifyPolyline(points: Point[]): Point[] {
     const prev = simplified[simplified.length - 1];
     const curr = deduped[i];
     const next = deduped[i + 1];
-    // Keep only non-collinear bends or 180-degree reversals
-    const v1 = { x: curr.x - prev.x, y: curr.y - prev.y };
-    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
-    if (isNonCollinearBend(prev, curr, next) || dot(v1, v2) < -EPS) {
+    if (!isStrictlyCollinearForward(prev, curr, next)) {
       simplified.push(curr);
     }
   }

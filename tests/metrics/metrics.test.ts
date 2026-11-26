@@ -210,6 +210,39 @@ describe('Objective Layout Metrics Evaluator', () => {
     };
     expect(evaluateLayout(sharedWpDoc).edgeCrossings).toBe(1);
   });
+
+  it('preserves shallow-angle bends during crossing calculation (P02 regression test)', () => {
+    // Edge A: center (0,0) -> waypoint (25000,10) -> center (50000,0)
+    // Edge B: center (5000,5) -> center (45000,5)
+    // Crosses at (12500,5) and (37500,5) => exactly 2 crossings
+    const doc: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'a_start', x: -10, y: -10, width: 20, height: 20, regionId: null },
+        { id: 'a_end', x: 49990, y: -10, width: 20, height: 20, regionId: null },
+        { id: 'b_start', x: 4990, y: -5, width: 20, height: 20, regionId: null },
+        { id: 'b_end', x: 44990, y: -5, width: 20, height: 20, regionId: null },
+      ],
+      edges: [
+        {
+          id: 'edge_a',
+          source: 'a_start',
+          target: 'a_end',
+          waypoints: [{ x: 25000, y: 10 }],
+        },
+        {
+          id: 'edge_b',
+          source: 'b_start',
+          target: 'b_end',
+          waypoints: [],
+        },
+      ],
+      regions: [],
+    };
+
+    expect(evaluateLayout(doc).edgeCrossings).toBe(2);
+  });
 });
 
 describe('Benchmark & Demo Fixtures Validation', () => {
