@@ -1,0 +1,25 @@
+{
+  "nodes": [
+    { "id": "disconnected", "label": "Disconnected" },
+    { "id": "connecting", "label": "Connecting" },
+    { "id": "connected", "label": "Connected" },
+    { "id": "retrying", "label": "Retrying" },
+    { "id": "suspended", "label": "Suspended" }
+  ],
+  "edges": [
+    { "id": "e1", "source": "disconnected", "target": "connecting", "label": "connect" },
+    { "id": "e2", "source": "connecting", "target": "connected", "label": "ack" },
+    { "id": "e3", "source": "connecting", "target": "retrying", "label": "timeout" },
+    { "id": "e4", "source": "retrying", "target": "connecting", "label": "retry" },
+    { "id": "e5", "source": "connected", "target": "connected", "label": "heartbeat" },
+    { "id": "e6", "source": "connected", "target": "suspended", "label": "pause" },
+    { "id": "e7", "source": "suspended", "target": "connected", "label": "resume" },
+    { "id": "e8", "source": "connected", "target": "disconnected", "label": "close" },
+    { "id": "e9", "source": "retrying", "target": "disconnected", "label": "abort" }
+  ],
+  "regions": [],
+  "metadata": {
+    "name": "Cycles, Feedback & Self-Loop",
+    "category": "cycles"
+  }
+}
