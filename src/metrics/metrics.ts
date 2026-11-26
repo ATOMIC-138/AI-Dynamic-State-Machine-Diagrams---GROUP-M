@@ -272,6 +272,10 @@ function nodesOverlap(a: VisibleNode, b: VisibleNode): boolean {
 /**
  * Independently evaluates a laid-out StateMachineDocument using objective geometric metrics.
  * Evaluates the VisibleGraph projection so both expanded and collapsed views are supported.
+ *
+ * Note on `nodeOverlaps`: intentionally counts overlaps between visible node entities
+ * (`StateNode` boxes and collapsed region circular proxies), excluding expanded dotted
+ * region container frames (which naturally enclose their descendant nodes).
  */
 export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
   const visible = projectVisibleGraph(doc);

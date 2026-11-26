@@ -71,10 +71,40 @@ export function importExternalGraph(
 
     if (Array.isArray(r.children)) {
       for (const childId of r.children) {
-        if (typeof childId === 'string') {
-          childToRegion.set(childId, r.id);
+        if (typeof childId !== 'string' || !childId) {
+          throw new Error(`Region ${r.id} contains invalid child id`);
         }
+        const existingOwner = childToRegion.get(childId);
+        if (existingOwner !== undefined) {
+          throw new Error(
+            `Child id ${childId} is listed multiple times in regions (${existingOwner} and ${r.id})`,
+          );
+        }
+        childToRegion.set(childId, r.id);
       }
+    }
+  }
+
+  // Validate node IDs and node/region ID collisions BEFORE resolving region parents,
+  // so a node sharing an ID with a region always reports the ID collision directly.
+  const nodeIds = new Set<string>();
+  for (const n of parsed.nodes) {
+    if (!isRecord(n) || typeof n.id !== 'string' || !n.id) {
+      throw new Error('Invalid node entry: missing string id');
+    }
+    if (nodeIds.has(n.id)) {
+      throw new Error(`Duplicate node id: ${n.id}`);
+    }
+    if (regionIds.has(n.id)) {
+      throw new Error(`Node id collides with region id: ${n.id}`);
+    }
+    nodeIds.add(n.id);
+  }
+
+  // Validate every child referenced in regions[].children exists as a node or region.
+  for (const [childId, ownerRegionId] of childToRegion.entries()) {
+    if (!nodeIds.has(childId) && !regionIds.has(childId)) {
+      throw new Error(`Region ${ownerRegionId} lists unknown child id: ${childId}`);
     }
   }
 
@@ -88,6 +118,11 @@ export function importExternalGraph(
           ? rec.parent
           : null;
     const inferredParent = childToRegion.get(id) ?? null;
+    if (explicitParent !== null && inferredParent !== null && explicitParent !== inferredParent) {
+      throw new Error(
+        `Conflicting parent for region ${id}: parent=${explicitParent} vs children of ${inferredParent}`,
+      );
+    }
     const parentId = explicitParent ?? inferredParent;
 
     if (parentId !== null && !regionIds.has(parentId)) {
@@ -109,35 +144,31 @@ export function importExternalGraph(
 
   assertNoRegionCycles(regions);
 
-  const nodeIds = new Set<string>();
   const nodes: StateNode[] = parsed.nodes.map((n) => {
-    if (!isRecord(n) || typeof n.id !== 'string' || !n.id) {
-      throw new Error('Invalid node entry: missing string id');
-    }
-    if (nodeIds.has(n.id)) {
-      throw new Error(`Duplicate node id: ${n.id}`);
-    }
-    if (regionIds.has(n.id)) {
-      throw new Error(`Node id collides with region id: ${n.id}`);
-    }
-    nodeIds.add(n.id);
+    const rec = n as Record<string, unknown>;
+    const id = rec.id as string;
 
     const explicitRegion =
-      typeof n.regionId === 'string' ? n.regionId : null;
-    const inferredRegion = childToRegion.get(n.id) ?? null;
+      typeof rec.regionId === 'string' ? rec.regionId : null;
+    const inferredRegion = childToRegion.get(id) ?? null;
+    if (explicitRegion !== null && inferredRegion !== null && explicitRegion !== inferredRegion) {
+      throw new Error(
+        `Conflicting region for node ${id}: regionId=${explicitRegion} vs children of ${inferredRegion}`,
+      );
+    }
     const regionId = explicitRegion ?? inferredRegion;
 
     if (regionId !== null && !regionIds.has(regionId)) {
-      throw new Error(`Node ${n.id} references unknown region: ${regionId}`);
+      throw new Error(`Node ${id} references unknown region: ${regionId}`);
     }
 
     return {
-      id: n.id,
-      label: typeof n.label === 'string' ? n.label : n.id,
+      id,
+      label: typeof rec.label === 'string' ? rec.label : id,
       x: 0,
       y: 0,
-      width: isFiniteNumber(n.width) && n.width > 0 ? n.width : DEFAULT_NODE_WIDTH,
-      height: isFiniteNumber(n.height) && n.height > 0 ? n.height : DEFAULT_NODE_HEIGHT,
+      width: isFiniteNumber(rec.width) && rec.width > 0 ? rec.width : DEFAULT_NODE_WIDTH,
+      height: isFiniteNumber(rec.height) && rec.height > 0 ? rec.height : DEFAULT_NODE_HEIGHT,
       regionId,
       isUserCreated: false,
     };

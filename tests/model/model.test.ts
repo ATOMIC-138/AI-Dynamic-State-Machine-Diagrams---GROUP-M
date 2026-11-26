@@ -316,7 +316,7 @@ describe('Serialization (Import External & Save/Load without Auto-Relayout)', ()
       importExternalGraph({
         nodes: [{ id: 'dup_1' }],
         edges: [],
-        regions: [{ id: 'dup_1', parent: null }],
+        regions: [{ id: 'dup_1', parent: null, children: ['dup_1'] }],
       }),
     ).toThrow(/collides with region id/);
 
@@ -358,5 +358,37 @@ describe('Serialization (Import External & Save/Load without Auto-Relayout)', ()
     // Other nodes remain strictly untouched
     expect(moved.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 20, y: 100 });
     expect(moved.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+  });
+
+  it('rejects unknown child IDs and duplicate child membership in regions.children', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [{ id: 'r1', parent: null, children: ['missing_id'] }],
+      }),
+    ).toThrow(/unknown child id: missing_id/);
+
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: null, children: ['s1'] },
+          { id: 'r2', parent: null, children: ['s1'] },
+        ],
+      }),
+    ).toThrow(/listed multiple times in regions/);
+
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1', regionId: 'r1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: null },
+          { id: 'r2', parent: null, children: ['s1'] },
+        ],
+      }),
+    ).toThrow(/Conflicting region for node s1/);
   });
 });
