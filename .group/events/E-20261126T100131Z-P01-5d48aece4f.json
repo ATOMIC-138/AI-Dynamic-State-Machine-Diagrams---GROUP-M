@@ -1,0 +1,53 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T100131Z-P01-5d48aece4f",
+  "event_type": "change_published",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-26T10:01:31.281083Z",
+  "related_events": [],
+  "change_id": "C-P01-9833a373ea",
+  "branch": "people/P01/model-metrics",
+  "commit": "f14e51c3c1dc1a5a06371d20517f00c64086afe1",
+  "summary": "Implement Member A core modules: Graph Model CRUD, Underlying/Visible hierarchical projection, JSON Import/Save/Load, independent Layout Metrics evaluator, 4 benchmark fixtures, and 20 unit tests",
+  "base_commit": "8102e40111fe04280b14d706fd57aade1ad62f3b",
+  "files_changed": [
+    "fixtures/cycles-feedback.json",
+    "fixtures/high-crossing.json",
+    "fixtures/linear-branch.json",
+    "fixtures/nested-regions.json",
+    "src/metrics/index.ts",
+    "src/metrics/metrics.ts",
+    "src/model/graphModel.ts",
+    "src/model/index.ts",
+    "src/model/serialization.ts",
+    "src/model/visibleProjection.ts",
+    "tests/metrics/metrics.test.ts",
+    "tests/model/model.test.ts"
+  ],
+  "interface_changes": [
+    "src/model/index.ts exports importExternalGraph, exportDocument, loadSavedDocument, projectVisibleGraph, moveNode, updateEdgeWaypoints, addNode, addEdge, toggleRegionCollapse",
+    "src/metrics/index.ts exports evaluateLayout and compareLayouts"
+  ],
+  "tests_run": [
+    "[\"C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\pipx\\\\pipx\\\\venvs\\\\groupctl\\\\Scripts\\\\python.exe\", \"scripts/run_checks.py\"]"
+  ],
+  "known_issues": [],
+  "proposed_for_integration": true,
+  "validation": {
+    "automated_result": "pass",
+    "results": [
+      {
+        "argv": [
+          "C:\\Users\\user\\AppData\\Local\\pipx\\pipx\\venvs\\groupctl\\Scripts\\python.exe",
+          "scripts/run_checks.py"
+        ],
+        "exit_code": 0,
+        "stdout": "[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run typecheck\n\n> state-machine-diagram-layout-editor@0.1.0 typecheck\n> tsc --noEmit\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd test\n\n> state-machine-diagram-layout-editor@0.1.0 test\n> vitest run\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90mC:/Users/user/AppData/Local/Temp/groupctl-test-vv5cnlce/checkout\u001b[39m\n\n \u001b[32m✓\u001b[39m tests/model/contract.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/model/model.test.ts \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/metrics/metrics.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m3 passed\u001b[39m\u001b[22m\u001b[90m (3)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m20 passed\u001b[39m\u001b[22m\u001b[90m (20)\u001b[39m\n\u001b[2m   Start at \u001b[22m 18:01:21\n\u001b[2m   Duration \u001b[22m 592ms\u001b[2m (transform 132ms, setup 0ms, collect 292ms, tests 15ms, environment 1ms, prepare 360ms)\u001b[22m\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run build\n\n> state-machine-diagram-layout-editor@0.1.0 build\n> tsc --noEmit && vite build\n\n\u001b[36mvite v6.4.6 \u001b[32mbuilding for production...\u001b[36m\u001b[39m\ntransforming...\n\u001b[32m✓\u001b[39m 29 modules transformed.\nrendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                 \u001b[39m\u001b[1m\u001b[2m  0.44 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:  0.29 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[35massets/index-zsd8hvR2.css  \u001b[39m\u001b[1m\u001b[2m  0.41 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:  0.28 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[36massets/index-CJgbzJZl.js   \u001b[39m\u001b[1m\u001b[2m224.14 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 69.64 kB\u001b[22m\n\u001b[32m✓ built in 531ms\u001b[39m\n",
+        "stderr": "",
+        "counts": null,
+        "evidence_state": "pass"
+      }
+    ]
+  }
+}
