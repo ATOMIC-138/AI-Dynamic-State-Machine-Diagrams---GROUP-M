@@ -70,6 +70,11 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     parallels.set(key, pair);
   }
 
+  const parallelLanes = new Map<string, { index: number; count: number }>();
+  for (const group of parallels.values()) {
+    group.forEach((id, index) => parallelLanes.set(id, { index, count: group.length }));
+  }
+
   const layouts = new Map<Scope, ReturnType<typeof layoutLayers>>();
   const regionPadding = settings.regionPadding;
   function arrange(scope: Scope) {
@@ -77,9 +82,10 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     for (const region of level.children) {
       arrange(region.id);
       const inner = layouts.get(region.id)!;
+      const diameter = region.collapsed ? 2 * (region.collapsedRadius ?? 36) : 0;
       level.sizes.set(regionKey(region.id), {
-        width: Math.max(1, inner.width) + 2 * regionPadding,
-        height: Math.max(1, inner.height) + 2 * regionPadding,
+        width: Math.max(diameter, Math.max(1, inner.width) + 2 * regionPadding),
+        height: Math.max(diameter, Math.max(1, inner.height) + 2 * regionPadding),
       });
     }
     layouts.set(scope, layoutLayers(level.sizes, level.edges, settings));
@@ -98,9 +104,13 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
   }
   flatten(null, { x: 0, y: 0 });
 
+  const feedbackLanes = new Map<string, { index: number; count: number }>();
+  for (const layout of layouts.values()) {
+    [...layout.feedback].forEach((id, index) => feedbackLanes.set(id, { index, count: layout.feedback.size }));
+  }
   const reversedEdgeIds: string[] = [];
   const paths = new Map<string, Point[]>();
-  const alternateRoutes = new Map<string, Point[]>();
+  const alternateRoutes = new Map<string, () => Point[]>();
   const edges = doc.edges.map((edge): TransitionEdge => {
     const scope = edgeScopes.get(edge.id);
     if (scope === undefined) return { ...edge, waypoints: edge.waypoints.map((point) => ({ ...point })) };
@@ -117,13 +127,12 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
         .map((node) => absolute.get(nodeKey(node.id))!),
       ...doc.regions.filter((region) => !ancestors.has(region.id)).map((region) => absolute.get(regionKey(region.id))!),
     ];
-    const pair = parallels.get(pairKey(edge))!;
     const geometry = { source, target, guides, blockers, bounds: { ...offset, width: layout.width, height: layout.height } };
-    const lane = { feedback, parallelIndex: pair.indexOf(edge.id), parallelCount: pair.length };
+    const lane = { feedback: feedbackLanes.get(edge.id), parallel: parallelLanes.get(edge.id)! };
     const waypoints = routeEdge(edge, geometry, settings, lane);
     paths.set(edge.id, [center(source), ...waypoints, center(target)]);
     if (feedback && settings.sweepIterations > 0) {
-      alternateRoutes.set(edge.id, routeEdge(edge, geometry, settings, { ...lane, alternateSide: true }));
+      alternateRoutes.set(edge.id, () => routeEdge(edge, geometry, settings, { ...lane, alternateSide: true }));
     }
     return { ...edge, waypoints };
   });
@@ -134,11 +143,15 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     const alternate = alternateRoutes.get(edge.id);
     if (!alternate) continue;
     const original = paths.get(edge.id)!;
-    const candidate = [original[0], ...alternate, original[original.length - 1]];
     const others = [...paths].filter(([id]) => id !== edge.id).map(([, path]) => path);
-    if (countRouteCrossings(candidate, others) < countRouteCrossings(original, others)) {
+    const before = countRouteCrossings(original, others);
+    if (!before.total) continue;
+    const waypoints = alternate();
+    const candidate = [original[0], ...waypoints, original[original.length - 1]];
+    const after = countRouteCrossings(candidate, others);
+    if (after.total < before.total && after.segmentInteriors <= before.segmentInteriors) {
       paths.set(edge.id, candidate);
-      edge.waypoints = alternate;
+      edge.waypoints = waypoints;
     }
   }
 
@@ -147,15 +160,12 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
       ...doc,
       layoutApplied: true,
       nodes: doc.nodes.map((node) => ({ ...node, ...absolute.get(nodeKey(node.id))! })),
-      regions: doc.regions.map((region) => {
-        const box = absolute.get(regionKey(region.id))!;
-        const old = region.collapsedPosition;
-        return {
-          ...region,
-          ...box,
-          ...(old && { collapsedPosition: { x: old.x + box.x - region.x, y: old.y + box.y - region.y } }),
-        };
-      }),
+      // An explicit re-layout restores the proxy to the center of its new box.
+      regions: doc.regions.map((region) => ({
+        ...region,
+        ...absolute.get(regionKey(region.id))!,
+        collapsedPosition: undefined,
+      })),
       edges,
     },
     stats: {

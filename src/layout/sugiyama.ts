@@ -136,6 +136,8 @@ export function layoutLayers(
   const dummyPaths = new Map<string, Vertex[]>();
   let dummyNodeCount = 0;
   for (const { edge, source, target } of oriented) {
+    // Feedback edges influence ranks, but their routes run around the layers.
+    if (feedback.has(edge.id)) continue;
     const path: Vertex[] = [];
     let previous = source;
     for (let rank = source.rank + 1; rank < target.rank; rank++) {
@@ -147,7 +149,6 @@ export function layoutLayers(
       dummyNodeCount++;
     }
     link(previous, target);
-    if (feedback.has(edge.id)) path.reverse();
     dummyPaths.set(edge.id, path);
   }
   layers.forEach(updateOrder);

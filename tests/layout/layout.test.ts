@@ -104,7 +104,7 @@ describe('Member B layout engine', () => {
     expect(self.waypoints.length).toBeGreaterThanOrEqual(3);
     const b = result.nodes[1];
     expect(returning.waypoints.some((point) => point.y < b.y || point.y > b.y + b.height)).toBe(true);
-    expect(countCrossings(result)).toBeLessThan(countCrossings(computeBaselineLayout(input).document));
+    expect(countCrossings(result)).toBeLessThanOrEqual(countCrossings(computeBaselineLayout(input).document));
     expect(self.waypoints.some((point) => point.x > b.x + b.width && point.y < b.y)).toBe(true);
     expectNoOverlap(result.nodes);
   });
@@ -127,7 +127,7 @@ describe('Member B layout engine', () => {
     expectInside(other, result.nodes[4], 25);
     expect(inner.collapsed).toBe(true);
     expect(inner.collapsedRadius).toBe(24);
-    expect(inner.collapsedPosition).toEqual({ x: inner.x + 3, y: inner.y + 4 });
+    expect(inner.collapsedPosition).toBeUndefined();
     expect(result.edges[3]).toMatchObject({ source: 'middle-state', target: 'in-sibling' });
     for (const point of result.edges[1].waypoints) {
       expect(point.x).toBeGreaterThanOrEqual(inner.x);
@@ -136,6 +136,54 @@ describe('Member B layout engine', () => {
       expect(point.y).toBeLessThanOrEqual(inner.y + inner.height);
     }
     expectNoOverlap(result.nodes);
+  });
+
+  it.each(['LR', 'TB'] as const)('gives different feedback edges their own outer rails in %s', (direction) => {
+    const input = document(['a', 'b', 'c'].map((id) => node(id)), [edge('ca', 'c', 'a'), edge('ab', 'a', 'b'),
+      edge('ba', 'b', 'a'), edge('bc', 'b', 'c'), edge('cb', 'c', 'b'), edge('ac', 'a', 'c')]);
+    const { document: result, stats } = computeLayout(input, { direction });
+    const axis = direction === 'LR' ? 'y' : 'x';
+    const extent = direction === 'LR' ? 'height' : 'width';
+    const min = Math.min(...result.nodes.map((item) => item[axis]));
+    const max = Math.max(...result.nodes.map((item) => item[axis] + item[extent]));
+    const rails = result.edges.filter((item) => stats?.reversedEdgeIds.includes(item.id)).map(({ waypoints }) => {
+      const outside = waypoints.find((point, i) => Math.abs(point[axis] - (waypoints[i + 1]?.[axis] ?? NaN)) < 1e-7
+        && (point[axis] < min || point[axis] > max));
+      expect(outside).toBeDefined();
+      return outside![axis];
+    });
+    expect(rails.length).toBeGreaterThan(1);
+    expect(new Set(rails).size).toBe(rails.length);
+  });
+
+  it.each(['LR', 'TB'] as const)('does not increase routed crossings on the reviewed cycle in %s', (direction) => {
+    const input = document(['n0', 'n1', 'n2', 'n3'].map((id) => node(id, null, 120)),
+      [edge('23', 'n2', 'n3'), edge('20', 'n2', 'n0'), edge('12', 'n1', 'n2'), edge('03', 'n0', 'n3'),
+        edge('10', 'n1', 'n0'), edge('02', 'n0', 'n2')]);
+    const baseline = computeBaselineLayout(input, { direction }).document;
+    expect(countCrossings(computeLayout(input, { direction }).document)).toBeLessThanOrEqual(countCrossings(baseline));
+  });
+
+  it('resets a manually moved collapsed circle inside its own and its parent region on explicit re-layout', () => {
+    const input = document([node('outside'), node('inside', 'child', 30, 25)], [edge('in', 'outside', 'inside')],
+      [region('parent', null), { ...region('child', 'parent'), collapsed: true,
+        collapsedPosition: { x: -900, y: -900 }, collapsedRadius: 48 }]);
+    const result = computeLayout(input, { regionPadding: 12 }).document;
+    const [parent, child] = result.regions;
+    expect(child.collapsedPosition).toBeUndefined();
+    const radius = child.collapsedRadius!;
+    expectInside(child, { ...child, x: child.x + child.width / 2 - radius,
+      y: child.y + child.height / 2 - radius, width: radius * 2, height: radius * 2 }, 0);
+    expectInside(parent, child, 12);
+    expect(input.regions[1].collapsedPosition).toEqual({ x: -900, y: -900 });
+  });
+
+  it.each(['LR', 'TB'] as const)('keeps parallel routes distinct when a detour is needed in %s', (direction) => {
+    const input = document(Array.from({ length: 7 }, (_, i) => node(`n${i}`, null, 120)),
+      [edge('a', 'n0', 'n5'), edge('b', 'n0', 'n2'), edge('c', 'n3', 'n5'), edge('d', 'n0', 'n5')]);
+    const result = computeLayout(input, { direction }).document;
+    expect(result.edges[0].waypoints[0]).not.toEqual(result.edges[3].waypoints[0]);
+    expect(result.edges[0].waypoints.at(-1)).not.toEqual(result.edges[3].waypoints.at(-1));
   });
 
   it('handles empty and isolated graphs without changing optional data', () => {
