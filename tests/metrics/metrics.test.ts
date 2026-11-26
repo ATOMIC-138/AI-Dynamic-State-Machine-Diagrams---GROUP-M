@@ -82,6 +82,58 @@ describe('Objective Layout Metrics Evaluator', () => {
     };
     expect(evaluateLayout(doc).nodeOverlaps).toBe(1);
   });
+
+  it('handles empty graphs cleanly without NaN or Infinity', () => {
+    const empty: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [],
+      edges: [],
+      regions: [],
+    };
+    expect(evaluateLayout(empty)).toEqual({
+      edgeCrossings: 0,
+      nodeOverlaps: 0,
+      totalEdgeLength: 0,
+      totalBends: 0,
+      boundingWidth: 0,
+      boundingHeight: 0,
+      boundingArea: 0,
+      aspectRatio: 0,
+    });
+  });
+
+  it('counts multiple crossings across multi-waypoint polylines and evaluates collapsed regions', () => {
+    const doc: StateMachineDocument = {
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes: [
+        { id: 'l1', x: 0, y: 0, width: 40, height: 40, regionId: null },
+        { id: 'r1', x: 300, y: 0, width: 40, height: 40, regionId: null },
+        { id: 'l2', x: 0, y: 100, width: 40, height: 40, regionId: null },
+        { id: 'r2', x: 300, y: 100, width: 40, height: 40, regionId: null },
+      ],
+      edges: [
+        // Straight horizontal at y = 20
+        { id: 'e1', source: 'l1', target: 'r1', waypoints: [] },
+        // Zig-zags up above y = 20 and back down, crossing e1 twice
+        {
+          id: 'e2',
+          source: 'l2',
+          target: 'r2',
+          waypoints: [
+            { x: 100, y: -20 },
+            { x: 200, y: -20 },
+          ],
+        },
+      ],
+      regions: [],
+    };
+
+    const metrics = evaluateLayout(doc);
+    expect(metrics.edgeCrossings).toBe(2);
+    expect(metrics.totalBends).toBe(2);
+  });
 });
 
 describe('Benchmark & Demo Fixtures Validation', () => {

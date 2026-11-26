@@ -26,6 +26,21 @@ function parsePoint(raw: unknown, context: string): Point {
   return { x: raw.x, y: raw.y };
 }
 
+function assertNoRegionCycles(regions: RegionNode[]): void {
+  const parentMap = new Map<string, string | null>(regions.map((r) => [r.id, r.parentId]));
+  for (const r of regions) {
+    const seen = new Set<string>([r.id]);
+    let cur = r.parentId;
+    while (cur !== null) {
+      if (seen.has(cur)) {
+        throw new Error(`Cyclic region hierarchy detected involving region: ${r.id}`);
+      }
+      seen.add(cur);
+      cur = parentMap.get(cur) ?? null;
+    }
+  }
+}
+
 /**
  * Imports an external state machine graph structure (from upstream groups) into
  * our normalized Underlying Graph. Marks layoutApplied: false so the editor
@@ -92,6 +107,8 @@ export function importExternalGraph(
     };
   });
 
+  assertNoRegionCycles(regions);
+
   const nodeIds = new Set<string>();
   const nodes: StateNode[] = parsed.nodes.map((n) => {
     if (!isRecord(n) || typeof n.id !== 'string' || !n.id) {
@@ -123,7 +140,18 @@ export function importExternalGraph(
     };
   });
 
-  const edgeIds = new Set<string>();
+  const explicitEdgeIds = new Set<string>();
+  for (const e of parsed.edges) {
+    if (isRecord(e) && typeof e.id === 'string' && e.id) {
+      if (explicitEdgeIds.has(e.id)) {
+        throw new Error(`Duplicate edge id: ${e.id}`);
+      }
+      explicitEdgeIds.add(e.id);
+    }
+  }
+
+  const edgeIds = new Set<string>(explicitEdgeIds);
+  let nextAutoEdgeIndex = 1;
   const edges: TransitionEdge[] = parsed.edges.map((e, index) => {
     if (!isRecord(e) || typeof e.source !== 'string' || typeof e.target !== 'string') {
       throw new Error(`Invalid edge at index ${index}: missing source or target`);
@@ -135,11 +163,15 @@ export function importExternalGraph(
       throw new Error(`Edge at index ${index} references unknown target node: ${e.target}`);
     }
 
-    const id = typeof e.id === 'string' && e.id ? e.id : `e_${index + 1}`;
-    if (edgeIds.has(id)) {
-      throw new Error(`Duplicate edge id: ${id}`);
+    let id: string;
+    if (typeof e.id === 'string' && e.id) {
+      id = e.id;
+    } else {
+      do {
+        id = `e_${nextAutoEdgeIndex++}`;
+      } while (edgeIds.has(id));
+      edgeIds.add(id);
     }
-    edgeIds.add(id);
 
     return {
       id,
@@ -224,9 +256,14 @@ export function loadSavedDocument(rawJson: string | unknown): StateMachineDocume
       !isFiniteNumber(r.y) ||
       !isFiniteNumber(r.width) ||
       !isFiniteNumber(r.height) ||
+      r.width < 0 ||
+      r.height < 0 ||
       typeof r.collapsed !== 'boolean'
     ) {
       throw new Error(`Invalid geometry or collapsed flag on region ${r.id}`);
+    }
+    if (r.collapsedRadius !== undefined && (!isFiniteNumber(r.collapsedRadius) || r.collapsedRadius <= 0)) {
+      throw new Error(`Invalid collapsedRadius on region ${r.id}`);
     }
 
     const parentId = typeof r.parentId === 'string' ? r.parentId : null;
@@ -254,6 +291,8 @@ export function loadSavedDocument(rawJson: string | unknown): StateMachineDocume
     }
   }
 
+  assertNoRegionCycles(regions);
+
   const nodeIds = new Set<string>();
   const nodes: StateNode[] = parsed.nodes.map((n, idx) => {
     if (!isRecord(n) || typeof n.id !== 'string' || !n.id) {
@@ -268,7 +307,9 @@ export function loadSavedDocument(rawJson: string | unknown): StateMachineDocume
       !isFiniteNumber(n.x) ||
       !isFiniteNumber(n.y) ||
       !isFiniteNumber(n.width) ||
-      !isFiniteNumber(n.height)
+      !isFiniteNumber(n.height) ||
+      n.width <= 0 ||
+      n.height <= 0
     ) {
       throw new Error(`Invalid geometry on node ${n.id}`);
     }

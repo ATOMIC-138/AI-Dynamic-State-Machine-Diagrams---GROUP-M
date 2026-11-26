@@ -243,4 +243,71 @@ describe('Serialization (Import External & Save/Load without Auto-Relayout)', ()
     });
     expect(restored.regions.find((r) => r.id === 'r_inner')?.collapsed).toBe(true);
   });
+
+  it('supports moving a collapsed region circular proxy without altering expanded bounds or other nodes', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsed = toggleRegionCollapse(orig, 'r_inner', true);
+    const movedProxy = moveNode(collapsed, 'r_inner', 450, 200);
+
+    // Visible proxy reflects new top-left (450, 200)
+    const visible = projectVisibleGraph(movedProxy);
+    const proxy = visible.nodes.find((n) => n.id === 'r_inner')!;
+    expect(proxy).toMatchObject({ kind: 'collapsed-region', x: 450, y: 200 });
+
+    // Expanded bounds & other nodes stay strictly untouched
+    const region = movedProxy.regions.find((r) => r.id === 'r_inner')!;
+    expect({ x: region.x, y: region.y, width: region.width, height: region.height }).toEqual({
+      x: 380,
+      y: 60,
+      width: 320,
+      height: 110,
+    });
+    expect(movedProxy.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+  });
+
+  it('keeps self-loops visible when expanded and hides them when inside a collapsed region', () => {
+    const doc = addEdge(createNestedLaidOutDoc(), {
+      id: 'e_self',
+      source: 'r2_x',
+      target: 'r2_x',
+      waypoints: [{ x: 460, y: 40 }],
+    });
+
+    expect(projectVisibleGraph(doc).edges.find((e) => e.id === 'e_self')).toBeDefined();
+
+    const collapsed = toggleRegionCollapse(doc, 'r_inner', true);
+    expect(projectVisibleGraph(collapsed).edges.find((e) => e.id === 'e_self')).toBeUndefined();
+  });
+
+  it('rejects cyclic region hierarchies, non-positive node dimensions, and avoids fallback edge ID collisions', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: 'r2' },
+          { id: 'r2', parent: 'r1' },
+        ],
+      }),
+    ).toThrow(/Cyclic region hierarchy/);
+
+    expect(() =>
+      loadSavedDocument({
+        schemaVersion: '1.0',
+        layoutApplied: true,
+        nodes: [{ id: 's1', x: 0, y: 0, width: 0, height: 50, regionId: null }],
+        edges: [],
+        regions: [],
+      }),
+    ).toThrow(/Invalid geometry/);
+
+    const mixed = importExternalGraph({
+      nodes: [{ id: 's1' }, { id: 's2' }],
+      edges: [
+        { source: 's1', target: 's2' },
+        { id: 'e_1', source: 's2', target: 's1' },
+      ],
+    });
+    expect(mixed.edges.map((e) => e.id)).toEqual(['e_2', 'e_1']);
+  });
 });

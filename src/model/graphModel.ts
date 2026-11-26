@@ -77,7 +77,8 @@ function ensureEnclosingRegions(doc: StateMachineDocument, node: StateNode): voi
 }
 
 /**
- * Moves a single node to (x, y). Never moves other nodes or triggers global relayout.
+ * Moves a single node (or a collapsed region's circular proxy node) to top-left (x, y).
+ * Never moves other nodes or triggers global relayout.
  */
 export function moveNode(
   doc: StateMachineDocument,
@@ -87,13 +88,24 @@ export function moveNode(
 ): StateMachineDocument {
   const next = cloneDocument(doc);
   const target = next.nodes.find((n) => n.id === nodeId);
-  if (!target) {
-    throw new Error(`Node not found: ${nodeId}`);
+  if (target) {
+    target.x = x;
+    target.y = y;
+    ensureEnclosingRegions(next, target);
+    return next;
   }
-  target.x = x;
-  target.y = y;
-  ensureEnclosingRegions(next, target);
-  return next;
+
+  const collapsedRegion = next.regions.find((r) => r.id === nodeId && r.collapsed);
+  if (collapsedRegion) {
+    const radius = collapsedRegion.collapsedRadius ?? DEFAULT_COLLAPSED_RADIUS;
+    collapsedRegion.collapsedPosition = {
+      x: x + radius,
+      y: y + radius,
+    };
+    return next;
+  }
+
+  throw new Error(`Node not found: ${nodeId}`);
 }
 
 /**
