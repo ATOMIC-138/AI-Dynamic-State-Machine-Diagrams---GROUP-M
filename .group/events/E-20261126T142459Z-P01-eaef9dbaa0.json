@@ -1,0 +1,16 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T142459Z-P01-eaef9dbaa0",
+  "event_type": "finding",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-26T14:24:59.080706Z",
+  "related_events": [
+    "E-20261126T141730Z-P03-e63a1790ec"
+  ],
+  "summary": "Resolution recorded: All 4 review issues and documentation notes fixed and verified (24/24 tests pass; high-crossing baseline verified 31 vs 1 optimized against P02 layout). Transitions currently strictly connect StateNode IDs (region endpoints deferred unless upstream groups require them).",
+  "evidence": [],
+  "resolves_events": [
+    "E-20261126T141730Z-P03-e63a1790ec"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261126T140717Z-P01-dd18576846",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-26T14:07:17.421637Z",
+  "related_events": [
+    "E-20261126T132103Z-P03-3de88a9bdf"
+  ],
+  "change_id": "C-P03-2c4358e8f8",
+  "verdict": "accept",
+  "summary": "Reviewed Member C interactive editor and UI (App, DiagramCanvas, backend, presets, session, interaction). Clean separation via backend.ts and auto-discovery of fixtures/*.json; zero file overlap.",
+  "issues": [],
+  "tests_run": [],
+  "inspected_commit": "5bc1fc273601ae66f3cdb56522a529e9d3f5792b",
+  "evidence": [
+    "Inspected src/App.tsx and src/editor/{backend,presets,session,DiagramCanvas}.ts(x): exact Backend interface matching Member A/B exports, moveNode top-left convention aligns with Member A collapsed region support, openSavedDocument restores without auto-relayout, isolated tests 28/28 pass; ready to wire real A+B backend during INT."
+  ]
+}
