@@ -1,0 +1,16 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T064516Z-P01-9b213a1a23",
+  "event_type": "finding",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-27T06:45:16.332944Z",
+  "related_events": [
+    "E-20261126T142601Z-P02-b96e47f170"
+  ],
+  "summary": "Resolution recorded: Both issues (async File.text race via trackLatestRequest and Fit-to-View including edge waypoints via contentBoxes) were fixed in C-P03-f474d15ee4, accepted by P02 in E-20261127T045837Z-P02-a60debec3e, and integrated into main.",
+  "evidence": [],
+  "resolves_events": [
+    "E-20261126T142601Z-P02-b96e47f170"
+  ]
+}
