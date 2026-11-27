@@ -1,0 +1,25 @@
+{
+  "protocol_version": "0.1",
+  "group_id": "GROUP-M",
+  "canonical_branch": "main",
+  "canonical_commit": "886ab30baa03303a4e42f5dd710cae3f29e3f9d8",
+  "report_file": ".group/final/final_report.md",
+  "initiated_by": "P01",
+  "created_at": "2026-11-27T07:13:19.746428Z",
+  "status": "completed_with_known_limitations",
+  "known_limitations": [
+    "Collapsed region proxy circles use a fixed 36px radius, so longer region labels (e.g., Authentication, TaskProcessing) extend slightly beyond the circle outline, and redirected boundary edges temporarily render directly without underlying waypoints until expanded (original waypoints are preserved and restored verbatim on expand).",
+    "When Fit-to-View zooms out below 20% on very large graphs (e.g., 200 states at ~14.5%), wheel zoom-in followed by wheel zoom-out stops at the 20% wheel floor and requires clicking Fit-to-View again to return to full-graph scale (non-blocking review note E-20261127T070407Z-P03-8972f93b69).",
+    "Per assignment.md scope boundaries, Process Algebra parsing, execution/ITG semantics, and decorative UML styling or on-canvas edge label typography are intentionally out of scope (edge labels remain inspectable via SVG hover tooltips)."
+  ],
+  "human_confirmation": {
+    "candidate_id": "E-20261127T071019Z-P01-c519d46322",
+    "canonical_commit": "886ab30baa03303a4e42f5dd710cae3f29e3f9d8",
+    "report_sha256": "68718cd466d19d0c8ce9a16663e3c1d3567d793a75fe225d8a9caf6e444a7b5e",
+    "confirmed_by": "P01",
+    "kind": "interactive_human_attestation",
+    "confirmed_at": "2026-11-27T07:13:15.495101Z",
+    "statement": "Operator explicitly confirmed the displayed candidate and report hash."
+  },
+  "evidence_mode": "real"
+}
