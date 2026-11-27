@@ -13,24 +13,294 @@ body {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
 .app-header {
-  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
   border-bottom: 1px solid #e5e7eb;
   background: #ffffff;
 }
 
 .app-header h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.25rem;
+  margin: 0;
+  font-size: 1.05rem;
 }
 
-.app-header p {
+.stub-badge,
+.stub-note {
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 6px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Toolbar */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-right: 0.5rem;
+  border-right: 1px solid #e5e7eb;
+}
+
+button,
+select {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+}
+
+button[aria-pressed='true'] {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Layout */
+
+.app-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.canvas-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: #ffffff;
+}
+
+.canvas-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  color: #4b5563;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.context-menu {
+  position: absolute;
+  z-index: 10;
+  padding: 0.25rem;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.context-menu button:hover {
+  background: #eef2ff;
+}
+
+/* Diagram */
+
+.diagram-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.diagram-canvas.mode-add-state,
+.diagram-canvas.mode-add-transition {
+  cursor: crosshair;
+}
+
+.region rect {
+  fill: rgba(99, 102, 241, 0.05);
+  stroke: #6366f1;
+  stroke-width: 1.5;
+}
+
+.region text {
+  fill: #4338ca;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.node {
+  cursor: move;
+}
+
+.node rect,
+.node circle {
+  fill: #ffffff;
+  stroke: #374151;
+  stroke-width: 1.5;
+}
+
+.node.collapsed circle {
+  fill: #eef2ff;
+  stroke: #4338ca;
+}
+
+.node.user-created rect {
+  fill: #fefce8;
+}
+
+.node.selected rect,
+.node.selected circle,
+.node.pending rect {
+  stroke: #2563eb;
+  stroke-width: 3;
+}
+
+.node text {
+  fill: #111827;
+  font-size: 13px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.node text.expand-icon {
+  fill: #4338ca;
+  font-size: 16px;
+}
+
+.edge {
+  cursor: pointer;
+}
+
+.edge-line {
+  fill: none;
+  stroke: #6b7280;
+  stroke-width: 1.5;
+}
+
+.edge-hit {
+  fill: none;
+  stroke: transparent;
+}
+
+.edge.redirected .edge-line {
+  stroke: #6366f1;
+}
+
+.edge.selected .edge-line {
+  stroke: #2563eb;
+  stroke-width: 2.5;
+}
+
+#arrow path {
+  fill: #6b7280;
+}
+
+#arrow-selected path {
+  fill: #2563eb;
+}
+
+.waypoint {
+  fill: #ffffff;
+  stroke: #2563eb;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  cursor: grab;
+}
+
+.waypoint.active {
+  fill: #2563eb;
+}
+
+/* Metrics and status */
+
+.metrics-panel {
+  width: 280px;
+  overflow-y: auto;
+  padding: 0.5rem 1rem;
+  border-left: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+}
+
+.metrics-panel h2 {
+  margin: 0.75rem 0 0.4rem;
   font-size: 0.9rem;
+}
+
+.metrics-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.metrics-panel th,
+.metrics-panel td {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.metrics-panel th[scope='row'] {
+  text-align: left;
+  font-weight: 500;
+}
+
+.reduction {
+  color: #166534;
+  font-weight: 700;
+}
+
+.hint {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 1rem;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 0.8rem;
+}
+
+.status-bar .error {
+  color: #b91c1c;
+}
+
+.mode-hint {
+  color: #6b7280;
 }
