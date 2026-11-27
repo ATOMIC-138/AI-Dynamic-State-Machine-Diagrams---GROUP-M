@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    { "id": "a1", "label": "Input A1" },
+    { "id": "a2", "label": "Input A2" },
+    { "id": "a3", "label": "Input A3" },
+    { "id": "a4", "label": "Input A4" },
+    { "id": "b1", "label": "Mid B1" },
+    { "id": "b2", "label": "Mid B2" },
+    { "id": "b3", "label": "Mid B3" },
+    { "id": "b4", "label": "Mid B4" },
+    { "id": "c1", "label": "Out C1" },
+    { "id": "c2", "label": "Out C2" },
+    { "id": "c3", "label": "Out C3" },
+    { "id": "c4", "label": "Out C4" }
+  ],
+  "edges": [
+    { "id": "e1", "source": "a1", "target": "b4" },
+    { "id": "e2", "source": "a1", "target": "b3" },
+    { "id": "e3", "source": "a2", "target": "b4" },
+    { "id": "e4", "source": "a2", "target": "b2" },
+    { "id": "e5", "source": "a3", "target": "b2" },
+    { "id": "e6", "source": "a3", "target": "b1" },
+    { "id": "e7", "source": "a4", "target": "b1" },
+    { "id": "e8", "source": "b1", "target": "c4" },
+    { "id": "e9", "source": "b1", "target": "c3" },
+    { "id": "e10", "source": "b2", "target": "c3" },
+    { "id": "e11", "source": "b2", "target": "c2" },
+    { "id": "e12", "source": "b3", "target": "c2" },
+    { "id": "e13", "source": "b3", "target": "c1" },
+    { "id": "e14", "source": "b4", "target": "c1" }
+  ],
+  "regions": [],
+  "metadata": {
+    "name": "High-Crossing Multi-Layer Benchmark",
+    "category": "crossing-benchmark"
+  }
+}

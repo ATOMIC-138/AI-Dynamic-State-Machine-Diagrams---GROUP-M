@@ -1,0 +1,394 @@
+import { describe, expect, it } from 'vitest';
+import {
+  addEdge,
+  addNode,
+  exportDocument,
+  importExternalGraph,
+  loadSavedDocument,
+  moveNode,
+  projectVisibleGraph,
+  toggleRegionCollapse,
+  updateEdgeWaypoints,
+} from '../../src/model';
+import type { StateMachineDocument } from '../../src/types/graph';
+
+function createNestedLaidOutDoc(): StateMachineDocument {
+  return {
+    schemaVersion: '1.0',
+    layoutApplied: true,
+    nodes: [
+      { id: 'ext_in', label: 'Start', x: 20, y: 100, width: 120, height: 50, regionId: null },
+      { id: 'r1_a', label: 'OuterA', x: 220, y: 80, width: 120, height: 50, regionId: 'r_outer' },
+      { id: 'r2_x', label: 'InnerX', x: 400, y: 80, width: 120, height: 50, regionId: 'r_inner' },
+      { id: 'r2_y', label: 'InnerY', x: 560, y: 80, width: 120, height: 50, regionId: 'r_inner' },
+      { id: 'ext_out', label: 'End', x: 780, y: 100, width: 120, height: 50, regionId: null },
+    ],
+    edges: [
+      {
+        id: 'e_in',
+        source: 'ext_in',
+        target: 'r1_a',
+        waypoints: [{ x: 180, y: 115 }],
+      },
+      {
+        id: 'e_enter_inner',
+        source: 'r1_a',
+        target: 'r2_x',
+        waypoints: [{ x: 370, y: 105 }],
+      },
+      {
+        id: 'e_inside_inner',
+        source: 'r2_x',
+        target: 'r2_y',
+        waypoints: [{ x: 540, y: 60 }],
+      },
+      {
+        id: 'e_out',
+        source: 'r2_y',
+        target: 'ext_out',
+        waypoints: [{ x: 730, y: 125 }],
+      },
+    ],
+    regions: [
+      {
+        id: 'r_outer',
+        label: 'OuterRegion',
+        parentId: null,
+        x: 200,
+        y: 40,
+        width: 520,
+        height: 160,
+        collapsed: false,
+      },
+      {
+        id: 'r_inner',
+        label: 'InnerRegion',
+        parentId: 'r_outer',
+        x: 380,
+        y: 60,
+        width: 320,
+        height: 110,
+        collapsed: false,
+      },
+    ],
+  };
+}
+
+describe('Graph Model & Interactive Editing Invariants', () => {
+  it('moves a single node without moving any other node', () => {
+    const doc = createNestedLaidOutDoc();
+    const moved = moveNode(doc, 'ext_in', 50, 220);
+
+    expect(moved.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 50, y: 220 });
+    // All other nodes must stay strictly unchanged
+    for (const orig of doc.nodes.filter((n) => n.id !== 'ext_in')) {
+      const curr = moved.nodes.find((n) => n.id === orig.id);
+      expect(curr).toMatchObject({ x: orig.x, y: orig.y });
+    }
+  });
+
+  it('updates edge waypoints without changing semantic source or target', () => {
+    const doc = createNestedLaidOutDoc();
+    const updated = updateEdgeWaypoints(doc, 'e_in', [
+      { x: 160, y: 80 },
+      { x: 195, y: 140 },
+    ]);
+
+    const edge = updated.edges.find((e) => e.id === 'e_in')!;
+    expect(edge.source).toBe('ext_in');
+    expect(edge.target).toBe('r1_a');
+    expect(edge.waypoints).toEqual([
+      { x: 160, y: 80 },
+      { x: 195, y: 140 },
+    ]);
+  });
+
+  it('adds user-created nodes and edges and marks isUserCreated', () => {
+    const doc = createNestedLaidOutDoc();
+    const withNode = addNode(doc, {
+      id: 'user_s1',
+      label: 'CustomState',
+      x: 400,
+      y: 260,
+      width: 120,
+      height: 50,
+      regionId: null,
+    });
+    const withEdge = addEdge(withNode, {
+      id: 'user_e1',
+      source: 'ext_in',
+      target: 'user_s1',
+      waypoints: [{ x: 200, y: 260 }],
+    });
+
+    expect(withEdge.nodes.find((n) => n.id === 'user_s1')?.isUserCreated).toBe(true);
+    expect(withEdge.edges.find((e) => e.id === 'user_e1')?.isUserCreated).toBe(true);
+  });
+});
+
+describe('Underlying vs. Visible Graph (Collapse / Expand & Nesting)', () => {
+  it('collapses inner region into circular node without moving external nodes and restores on expand', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsed = toggleRegionCollapse(orig, 'r_inner', true);
+
+    // UnderlyingGraph still holds all nodes and original waypoints untouched
+    expect(collapsed.nodes).toHaveLength(orig.nodes.length);
+    expect(collapsed.edges.find((e) => e.id === 'e_out')?.waypoints).toEqual([{ x: 730, y: 125 }]);
+
+    // External nodes must NOT move
+    expect(collapsed.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 20, y: 100 });
+    expect(collapsed.nodes.find((n) => n.id === 'r1_a')).toMatchObject({ x: 220, y: 80 });
+    expect(collapsed.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+
+    const visible = projectVisibleGraph(collapsed);
+    // r_inner is now a circular node, r_outer remains an expanded region
+    expect(visible.regions.map((r) => r.id)).toEqual(['r_outer']);
+    expect(visible.nodes.find((n) => n.id === 'r_inner')?.kind).toBe('collapsed-region');
+    expect(visible.nodes.find((n) => n.id === 'r2_x')).toBeUndefined();
+    expect(visible.nodes.find((n) => n.id === 'r2_y')).toBeUndefined();
+
+    // Internal edge e_inside_inner is hidden; boundary edges redirect to r_inner
+    expect(visible.edges.find((e) => e.id === 'e_inside_inner')).toBeUndefined();
+    expect(visible.edges.find((e) => e.id === 'e_enter_inner')).toMatchObject({
+      originalSource: 'r1_a',
+      originalTarget: 'r2_x',
+      displaySource: 'r1_a',
+      displayTarget: 'r_inner',
+      isRedirected: true,
+    });
+    expect(visible.edges.find((e) => e.id === 'e_out')).toMatchObject({
+      originalSource: 'r2_y',
+      originalTarget: 'ext_out',
+      displaySource: 'r_inner',
+      displayTarget: 'ext_out',
+      isRedirected: true,
+    });
+
+    // Re-expand restores exact internal nodes, dotted boundary, and manual waypoints
+    const expanded = toggleRegionCollapse(collapsed, 'r_inner', false);
+    const visibleAfterExpand = projectVisibleGraph(expanded);
+    expect(visibleAfterExpand.regions.map((r) => r.id).sort()).toEqual(['r_inner', 'r_outer']);
+    expect(visibleAfterExpand.nodes.find((n) => n.id === 'r2_x')).toMatchObject({ x: 400, y: 80 });
+    expect(visibleAfterExpand.edges.find((e) => e.id === 'e_inside_inner')?.waypoints).toEqual([
+      { x: 540, y: 60 },
+    ]);
+    expect(visibleAfterExpand.edges.find((e) => e.id === 'e_out')?.waypoints).toEqual([
+      { x: 730, y: 125 },
+    ]);
+  });
+
+  it('supports nested collapse when outer region collapses over an inner region', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsedOuter = toggleRegionCollapse(orig, 'r_outer', true);
+    const visible = projectVisibleGraph(collapsedOuter);
+
+    expect(visible.regions).toHaveLength(0);
+    expect(visible.nodes.map((n) => n.id).sort()).toEqual(['ext_in', 'ext_out', 'r_outer']);
+    expect(visible.edges.map((e) => e.id).sort()).toEqual(['e_in', 'e_out']);
+    expect(visible.edges.find((e) => e.id === 'e_in')?.displayTarget).toBe('r_outer');
+    expect(visible.edges.find((e) => e.id === 'e_out')?.displaySource).toBe('r_outer');
+  });
+});
+
+describe('Serialization (Import External & Save/Load without Auto-Relayout)', () => {
+  it('imports external graph with region children and marks layoutApplied: false', () => {
+    const doc = importExternalGraph({
+      nodes: [{ id: 's1' }, { id: 's2' }],
+      edges: [{ source: 's1', target: 's2' }],
+      regions: [{ id: 'r1', parent: null, children: ['s2'] }],
+    });
+
+    expect(doc.layoutApplied).toBe(false);
+    expect(doc.nodes.find((n) => n.id === 's2')?.regionId).toBe('r1');
+    expect(doc.edges[0].id).toBe('e_1');
+  });
+
+  it('round-trips Save -> Load preserving exact coordinates, waypoints, collapsed state, and user-created items', () => {
+    let doc = createNestedLaidOutDoc();
+    doc = moveNode(doc, 'ext_in', 77, 188);
+    doc = addNode(doc, {
+      id: 'u1',
+      label: 'Added',
+      x: 500,
+      y: 300,
+      width: 130,
+      height: 55,
+      regionId: null,
+    });
+    doc = addEdge(doc, {
+      id: 'ue1',
+      source: 'ext_in',
+      target: 'u1',
+      waypoints: [{ x: 250, y: 290 }],
+    });
+    doc = toggleRegionCollapse(doc, 'r_inner', true);
+
+    const json = exportDocument(doc);
+    const restored = loadSavedDocument(json);
+
+    expect(restored.layoutApplied).toBe(true);
+    expect(restored.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 77, y: 188 });
+    expect(restored.nodes.find((n) => n.id === 'u1')).toMatchObject({
+      x: 500,
+      y: 300,
+      width: 130,
+      height: 55,
+      isUserCreated: true,
+    });
+    expect(restored.edges.find((e) => e.id === 'ue1')).toMatchObject({
+      source: 'ext_in',
+      target: 'u1',
+      waypoints: [{ x: 250, y: 290 }],
+      isUserCreated: true,
+    });
+    expect(restored.regions.find((r) => r.id === 'r_inner')?.collapsed).toBe(true);
+  });
+
+  it('supports moving a collapsed region circular proxy without altering expanded bounds or other nodes', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsed = toggleRegionCollapse(orig, 'r_inner', true);
+    const movedProxy = moveNode(collapsed, 'r_inner', 450, 200);
+
+    // Visible proxy reflects new top-left (450, 200)
+    const visible = projectVisibleGraph(movedProxy);
+    const proxy = visible.nodes.find((n) => n.id === 'r_inner')!;
+    expect(proxy).toMatchObject({ kind: 'collapsed-region', x: 450, y: 200 });
+
+    // Expanded bounds & other nodes stay strictly untouched
+    const region = movedProxy.regions.find((r) => r.id === 'r_inner')!;
+    expect({ x: region.x, y: region.y, width: region.width, height: region.height }).toEqual({
+      x: 380,
+      y: 60,
+      width: 320,
+      height: 110,
+    });
+    expect(movedProxy.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+  });
+
+  it('keeps self-loops visible when expanded and hides them when inside a collapsed region', () => {
+    const doc = addEdge(createNestedLaidOutDoc(), {
+      id: 'e_self',
+      source: 'r2_x',
+      target: 'r2_x',
+      waypoints: [{ x: 460, y: 40 }],
+    });
+
+    expect(projectVisibleGraph(doc).edges.find((e) => e.id === 'e_self')).toBeDefined();
+
+    const collapsed = toggleRegionCollapse(doc, 'r_inner', true);
+    expect(projectVisibleGraph(collapsed).edges.find((e) => e.id === 'e_self')).toBeUndefined();
+  });
+
+  it('rejects cyclic region hierarchies, non-positive node dimensions, and avoids fallback edge ID collisions', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: 'r2' },
+          { id: 'r2', parent: 'r1' },
+        ],
+      }),
+    ).toThrow(/Cyclic region hierarchy/);
+
+    expect(() =>
+      loadSavedDocument({
+        schemaVersion: '1.0',
+        layoutApplied: true,
+        nodes: [{ id: 's1', x: 0, y: 0, width: 0, height: 50, regionId: null }],
+        edges: [],
+        regions: [],
+      }),
+    ).toThrow(/Invalid geometry/);
+
+    const mixed = importExternalGraph({
+      nodes: [{ id: 's1' }, { id: 's2' }],
+      edges: [
+        { source: 's1', target: 's2' },
+        { id: 'e_1', source: 's2', target: 's1' },
+      ],
+    });
+    expect(mixed.edges.map((e) => e.id)).toEqual(['e_2', 'e_1']);
+  });
+
+  it('rejects node IDs that collide with region IDs across import, load, and addNode', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 'dup_1' }],
+        edges: [],
+        regions: [{ id: 'dup_1', parent: null, children: ['dup_1'] }],
+      }),
+    ).toThrow(/collides with region id/);
+
+    expect(() =>
+      loadSavedDocument({
+        schemaVersion: '1.0',
+        layoutApplied: true,
+        nodes: [{ id: 'dup_1', x: 0, y: 0, width: 100, height: 50, regionId: null }],
+        edges: [],
+        regions: [{ id: 'dup_1', parentId: null, x: 0, y: 0, width: 200, height: 150, collapsed: false }],
+      }),
+    ).toThrow(/collides with region id/);
+
+    const doc = createNestedLaidOutDoc();
+    expect(() =>
+      addNode(doc, {
+        id: 'r_inner',
+        label: 'CollidingState',
+        x: 10,
+        y: 10,
+        width: 100,
+        height: 50,
+        regionId: null,
+      }),
+    ).toThrow(/collides with existing region id/);
+  });
+
+  it('expands parent region boundary when dragging a collapsed child region circle outside it', () => {
+    const orig = createNestedLaidOutDoc();
+    const collapsed = toggleRegionCollapse(orig, 'r_inner', true);
+    // Drag r_inner circle far right/down past r_outer's original right (720) and bottom (200)
+    const moved = moveNode(collapsed, 'r_inner', 700, 220);
+
+    const outer = moved.regions.find((r) => r.id === 'r_outer')!;
+    const circleRight = 700 + 72; // default radius 36 -> diameter 72
+    const circleBottom = 220 + 72;
+    expect(outer.x + outer.width).toBeGreaterThanOrEqual(circleRight + 24);
+    expect(outer.y + outer.height).toBeGreaterThanOrEqual(circleBottom + 24);
+    // Other nodes remain strictly untouched
+    expect(moved.nodes.find((n) => n.id === 'ext_in')).toMatchObject({ x: 20, y: 100 });
+    expect(moved.nodes.find((n) => n.id === 'ext_out')).toMatchObject({ x: 780, y: 100 });
+  });
+
+  it('rejects unknown child IDs and duplicate child membership in regions.children', () => {
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [{ id: 'r1', parent: null, children: ['missing_id'] }],
+      }),
+    ).toThrow(/unknown child id: missing_id/);
+
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: null, children: ['s1'] },
+          { id: 'r2', parent: null, children: ['s1'] },
+        ],
+      }),
+    ).toThrow(/listed multiple times in regions/);
+
+    expect(() =>
+      importExternalGraph({
+        nodes: [{ id: 's1', regionId: 'r1' }],
+        edges: [],
+        regions: [
+          { id: 'r1', parent: null },
+          { id: 'r2', parent: null, children: ['s1'] },
+        ],
+      }),
+    ).toThrow(/Conflicting region for node s1/);
+  });
+});

@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    { "id": "idle", "label": "Idle" },
+    { "id": "validate", "label": "Validate" },
+    { "id": "fast_path", "label": "FastPath" },
+    { "id": "slow_path", "label": "SlowPath" },
+    { "id": "reject", "label": "Rejected" },
+    { "id": "merge", "label": "Completed" }
+  ],
+  "edges": [
+    { "id": "e1", "source": "idle", "target": "validate", "label": "submit" },
+    { "id": "e2", "source": "validate", "target": "fast_path", "label": "cached" },
+    { "id": "e3", "source": "validate", "target": "slow_path", "label": "compute" },
+    { "id": "e4", "source": "validate", "target": "reject", "label": "invalid" },
+    { "id": "e5", "source": "fast_path", "target": "merge", "label": "ok" },
+    { "id": "e6", "source": "slow_path", "target": "merge", "label": "ok" }
+  ],
+  "regions": [],
+  "metadata": {
+    "name": "Linear & Branching Flow",
+    "category": "basic"
+  }
+}
