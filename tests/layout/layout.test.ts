@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeBaselineLayout, computeLayout } from '../../src/layout';
+import { countRouteCrossings } from '../../src/layout/edgeRouting';
 import type { Point, RegionNode, StateMachineDocument, StateNode, TransitionEdge } from '../../src/types/graph';
 
 function node(id: string, regionId: string | null = null, width = 100, height = 50): StateNode {
@@ -54,6 +55,25 @@ function expectInside(outer: RegionNode, inner: StateNode | RegionNode, padding:
   expect(inner.y).toBeGreaterThanOrEqual(outer.y + padding);
   expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width - padding);
   expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height - padding);
+}
+
+function entersNode(from: Point, to: Point, box: StateNode): boolean {
+  let enter = 0;
+  let exit = 1;
+  for (const [axis, size] of [['x', 'width'], ['y', 'height']] as const) {
+    const lower = box[axis] + 1e-6;
+    const upper = box[axis] + box[size] - 1e-6;
+    const change = to[axis] - from[axis];
+    if (!change) {
+      if (from[axis] < lower || from[axis] > upper) return false;
+      continue;
+    }
+    const a = (lower - from[axis]) / change;
+    const b = (upper - from[axis]) / change;
+    enter = Math.max(enter, Math.min(a, b));
+    exit = Math.min(exit, Math.max(a, b));
+  }
+  return enter < exit;
 }
 
 describe('Member B layout engine', () => {
@@ -184,6 +204,53 @@ describe('Member B layout engine', () => {
     const result = computeLayout(input, { direction }).document;
     expect(result.edges[0].waypoints[0]).not.toEqual(result.edges[3].waypoints[0]);
     expect(result.edges[0].waypoints.at(-1)).not.toEqual(result.edges[3].waypoints.at(-1));
+  });
+
+  it.each(['LR', 'TB'] as const)('only enters the source and target on their terminal segments in %s', (direction) => {
+    const input = document([node('n0', null, 191, 86), node('n1', null, 162, 41), node('n2', null, 147, 88),
+      node('n8', null, 204, 40), node('n9', null, 202, 51), node('n11', null, 210, 85)],
+      [edge('a', 'n1', 'n8'), edge('b', 'n1', 'n0'), edge('c', 'n1', 'n2')]);
+    const result = computeLayout(input, { direction }).document;
+    const map = new Map(result.nodes.map((item) => [item.id, item]));
+    for (const { source, target, waypoints } of result.edges) {
+      const from = map.get(source)!;
+      const to = map.get(target)!;
+      const path = [center(from), ...waypoints, center(to)];
+      for (let i = 1; i < path.length; i++) {
+        if (i > 1) expect(entersNode(path[i - 1], path[i], from)).toBe(false);
+        if (i < path.length - 1) expect(entersNode(path[i - 1], path[i], to)).toBe(false);
+      }
+      if (waypoints.length) {
+        expect(entersNode(waypoints[0], waypoints[0], from)).toBe(false);
+        const last = waypoints.at(-1)!;
+        expect(entersNode(last, last, to)).toBe(false);
+      }
+    }
+  });
+
+  it.each(['LR', 'TB'] as const)('makes room for ten feedback lanes inside a nested region in %s', (direction) => {
+    const returns = Array.from({ length: 10 }, (_, i) => edge(`return${i}`, 'b', 'a'));
+    const input = document([node('a', 'inner'), node('b', 'inner')], [edge('ab', 'a', 'b'), ...returns],
+      [region('outer', null), region('inner', 'outer')]);
+    const { document: result } = computeBaselineLayout(input, { direction });
+    const inner = result.regions[1];
+    const axis = direction === 'LR' ? 'y' : 'x';
+    const lower = Math.min(...result.nodes.map((item) => item[axis]));
+    const lanes = result.edges.slice(1).map((item) => {
+      const rail = item.waypoints.find((point, i) => point[axis] < lower && point[axis] === item.waypoints[i + 1]?.[axis]);
+      expect(rail).toBeDefined();
+      return rail![axis];
+    }).sort((a, b) => a - b);
+    expect(lanes[0]).toBeGreaterThan(inner[axis]);
+    for (let i = 1; i < lanes.length; i++) expect(lanes[i] - lanes[i - 1]).toBeGreaterThanOrEqual(6 - 1e-8);
+  });
+
+  it('accounts for a potentially crossing shared interior run when comparing layouts', () => {
+    const a = [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 60, y: 20 }, { x: 80, y: 0 }];
+    const b = [{ x: 0, y: 40 }, { x: 20, y: 20 }, { x: 60, y: 20 }, { x: 80, y: 0 }];
+    expect(countRouteCrossings(a, [b]).possibleContacts).toBe(1);
+    const sameSource = [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 60, y: 40 }];
+    expect(countRouteCrossings(a, [sameSource]).possibleContacts).toBe(0);
   });
 
   it('handles empty and isolated graphs without changing optional data', () => {

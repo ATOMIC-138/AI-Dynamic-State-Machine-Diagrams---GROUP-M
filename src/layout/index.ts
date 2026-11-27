@@ -16,12 +16,14 @@ function measureCrossings({ nodes, edges }: StateMachineDocument) {
   });
   let total = 0;
   let segmentInteriors = 0;
+  let possibleContacts = 0;
   routes.forEach((path, index) => {
     const crossings = countRouteCrossings(path, routes.slice(index + 1));
     total += crossings.total;
     segmentInteriors += crossings.segmentInteriors;
+    possibleContacts += crossings.possibleContacts;
   });
-  return { total, segmentInteriors };
+  return { total, segmentInteriors, possibleContacts };
 }
 
 export function computeLayout(doc: StateMachineDocument, options: LayoutOptions = {}): LayoutResult {
@@ -39,11 +41,13 @@ export function computeLayout(doc: StateMachineDocument, options: LayoutOptions 
 
   // Layer-order scores cannot see detours or lifted endpoints. Compare the actual routed edges.
   const optimizedCrossings = measureCrossings(optimized.document);
-  if (!optimizedCrossings.total) return optimized;
+  const upperBound = optimizedCrossings.total + optimizedCrossings.possibleContacts;
+  if (!upperBound) return optimized;
   const baseline = layoutHierarchy(doc, { ...settings, sweepIterations: 0 });
   const baselineCrossings = measureCrossings(baseline.document);
-  // Keep an improvement under both the interior-only and waypoint-aware counts.
-  return optimizedCrossings.total > baselineCrossings.total
+  // The independent metrics can classify a coincident run as a side swap. Only accept
+  // the candidate when even its conservative upper bound beats or ties the baseline.
+  return upperBound > baselineCrossings.total
     || optimizedCrossings.segmentInteriors > baselineCrossings.segmentInteriors ? baseline : optimized;
 }
 

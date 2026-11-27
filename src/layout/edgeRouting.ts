@@ -3,6 +3,11 @@ import type { LayoutBox, LayoutSettings } from './sugiyama';
 
 const EPSILON = 1e-8;
 const CROSSING_EPSILON = 1e-6;
+const FEEDBACK_LANE_SPACING = 6;
+
+export function feedbackLaneOffset(index: number, padding: number): number {
+  return Math.min(padding / 2, FEEDBACK_LANE_SPACING) + index * FEEDBACK_LANE_SPACING;
+}
 
 export function center(box: LayoutBox): Point {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
@@ -16,6 +21,20 @@ const opposite = (a: number, b: number) => (a > CROSSING_EPSILON && b < -CROSSIN
 function insideSegment(point: Point, a: Point, b: Point): boolean {
   return Math.abs(sideOf(a, b, point)) <= EPSILON
     && (point.x - a.x) * (point.x - b.x) + (point.y - a.y) * (point.y - b.y) < -EPSILON;
+}
+
+function overlapsAwayFromTerminals(a: Point, b: Point, c: Point, d: Point, terminals: readonly Point[]): boolean {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (length <= CROSSING_EPSILON || Math.abs(sideOf(a, b, c)) > CROSSING_EPSILON * length
+    || Math.abs(sideOf(a, b, d)) > CROSSING_EPSILON * length) return false;
+  const along = (point: Point) => ((point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y)) / length;
+  const from = Math.max(0, Math.min(along(c), along(d)));
+  const to = Math.min(length, Math.max(along(c), along(d)));
+  return to - from > CROSSING_EPSILON && terminals.every((point) => {
+    if (Math.abs(sideOf(a, b, point)) > CROSSING_EPSILON * length) return true;
+    const offset = along(point);
+    return offset < from - CROSSING_EPSILON || offset > to + CROSSING_EPSILON;
+  });
 }
 
 function crossAtSharedWaypoint(point: Point, a: Point, b: Point, c: Point, d: Point): boolean {
@@ -34,7 +53,9 @@ function crossAtSharedWaypoint(point: Point, a: Point, b: Point, c: Point, d: Po
 export function countRouteCrossings(path: readonly Point[], others: Iterable<readonly Point[]>) {
   let segmentInteriors = 0;
   let waypoints = 0;
+  let possibleContacts = 0;
   for (const other of others) {
+    const terminals = [path[0], path[path.length - 1], other[0], other[other.length - 1]];
     for (let i = 1; i < path.length; i++) {
       const [a, b] = [path[i - 1], path[i]];
       for (let j = 1; j < other.length; j++) {
@@ -53,18 +74,21 @@ export function countRouteCrossings(path: readonly Point[], others: Iterable<rea
           && Math.abs(b.x - d.x) < EPSILON && Math.abs(b.y - d.y) < EPSILON
           && crossAtSharedWaypoint(b, a, path[i + 1], c, other[j + 1])) {
           waypoints++;
+        } else if (overlapsAwayFromTerminals(a, b, c, d, terminals)) {
+          // An overlap could exchange sides; counting each piece gives a conservative bound.
+          possibleContacts++;
         }
       }
     }
   }
-  return { total: segmentInteriors + waypoints, segmentInteriors };
+  return { total: segmentInteriors + waypoints, segmentInteriors, possibleContacts };
 }
 
 function hitsBox(from: Point, to: Point, box: LayoutBox): boolean {
   const right = box.x + box.width;
   const bottom = box.y + box.height;
-  if (Math.max(from.x, to.x) <= box.x || Math.min(from.x, to.x) >= right
-    || Math.max(from.y, to.y) <= box.y || Math.min(from.y, to.y) >= bottom) return false;
+  if (Math.max(from.x, to.x) <= box.x + EPSILON || Math.min(from.x, to.x) >= right - EPSILON
+    || Math.max(from.y, to.y) <= box.y + EPSILON || Math.min(from.y, to.y) >= bottom - EPSILON) return false;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (Math.abs(dx) < EPSILON || Math.abs(dy) < EPSILON) return true;
@@ -83,6 +107,23 @@ function clear(from: Point, to: Point, obstacles: readonly LayoutBox[]): boolean
 function inside(point: Point, box: LayoutBox): boolean {
   return point.x > box.x + EPSILON && point.x < box.x + box.width - EPSILON
     && point.y > box.y + EPSILON && point.y < box.y + box.height - EPSILON;
+}
+
+function padBox(box: LayoutBox, margin: number): LayoutBox {
+  return { x: box.x - margin, y: box.y - margin, width: box.width + 2 * margin, height: box.height + 2 * margin };
+}
+
+function terminalPort(box: LayoutBox, toward: Point, margin: number, obstacles: readonly LayoutBox[]): Point | undefined {
+  const origin = center(box);
+  const dx = toward.x - origin.x;
+  const dy = toward.y - origin.y;
+  const distance = Math.min((box.width / 2 + margin) / Math.abs(dx), (box.height / 2 + margin) / Math.abs(dy));
+  const candidates = [
+    ...(Number.isFinite(distance) ? [{ x: origin.x + dx * distance, y: origin.y + dy * distance }] : []),
+    { x: box.x - margin, y: origin.y }, { x: box.x + box.width + margin, y: origin.y },
+    { x: origin.x, y: box.y - margin }, { x: origin.x, y: box.y + box.height + margin },
+  ];
+  return candidates.find((point) => clear(origin, point, obstacles));
 }
 
 function detour(start: Point, end: Point, obstacles: readonly LayoutBox[]): Point[] | undefined {
@@ -201,10 +242,7 @@ export function routeEdge(
   const end = center(target);
   const horizontal = settings.direction === 'LR';
   const clearance = Math.min(5, settings.nodeSpacing / 5, settings.layerSpacing / 5, settings.regionPadding / 2);
-  const obstacles = blockers.map((box) => ({
-    x: box.x - clearance, y: box.y - clearance,
-    width: box.width + 2 * clearance, height: box.height + 2 * clearance,
-  }));
+  const obstacles = blockers.map((box) => padBox(box, clearance));
 
   let controls: Point[] = [...guides];
   const crossAxis = horizontal ? 'y' : 'x';
@@ -226,7 +264,7 @@ export function routeEdge(
     }
   } else if (feedback) {
     const share = fraction(feedback);
-    const offset = settings.regionPadding * (0.2 + 0.65 * share);
+    const offset = feedbackLaneOffset(feedback.index, settings.regionPadding);
     const gap = Math.min(settings.layerSpacing, settings.regionPadding) * (0.2 + 0.6 * share);
     const rail = alternateSide ? bounds[crossAxis] + bounds[breadth] + offset : bounds[crossAxis] - offset;
     const leave = { ...start, [mainAxis]: source[mainAxis] + source[depth] + gap,
@@ -247,15 +285,37 @@ export function routeEdge(
     controls = [port(source, start, direction), ...controls, port(target, end, -direction)];
   }
 
-  const points = [start, ...controls.filter((point) => obstacles.every((box) => !inside(point, box))), end];
-  const path = [start];
+  const loop = edge.source === edge.target;
+  if (!loop && !controls.length && clear(start, end, obstacles)) return [];
+
+  // Only the two center-to-port stubs may cross their own endpoint boxes.
+  const margin = clearance / 2;
+  const sourceWall = padBox(source, margin);
+  const targetWall = loop ? sourceWall : padBox(target, margin);
+  const walls = loop ? [sourceWall] : [sourceWall, targetWall];
+  const padded = [...obstacles, ...walls];
+  const unpadded = [...blockers, ...walls];
+  const guidesOutside = controls.filter((point) => padded.every((box) => !inside(point, box)));
+  const exitObstacles = loop ? obstacles : [...obstacles, targetWall];
+  const entryObstacles = loop ? obstacles : [...obstacles, sourceWall];
+  const startDirection = guidesOutside[0] ?? (loop ? controls[0] : end);
+  const endDirection = guidesOutside.at(-1) ?? (loop ? controls.at(-1)! : start);
+  const exit = terminalPort(source, startDirection, clearance, exitObstacles)
+    ?? terminalPort(source, startDirection, clearance, loop ? blockers : [...blockers, targetWall]);
+  const entry = terminalPort(target, endDirection, clearance, entryObstacles)
+    ?? terminalPort(target, endDirection, clearance, loop ? blockers : [...blockers, sourceWall]);
+  if (!exit || !entry) throw new Error(`No open endpoint for edge ${edge.id}`);
+
+  const points = [exit, ...guidesOutside, entry];
+  const path = [start, exit];
   for (let i = 1; i < points.length; i++) {
     const from = points[i - 1];
     const to = points[i];
-    const bends = detour(from, to, obstacles) ?? detour(from, to, blockers);
+    const bends = detour(from, to, padded) ?? detour(from, to, unpadded);
     if (!bends) throw new Error(`No route between the endpoints of edge ${edge.id}`);
     path.push(...bends, to);
   }
+  path.push(end);
   return simplify(path);
 }
 

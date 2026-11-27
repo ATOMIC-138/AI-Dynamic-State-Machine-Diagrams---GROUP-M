@@ -1,5 +1,5 @@
 import type { LayoutResult, Point, RegionNode, StateMachineDocument, TransitionEdge } from '../types/graph';
-import { center, countRouteCrossings, routeEdge } from './edgeRouting';
+import { center, countRouteCrossings, feedbackLaneOffset, routeEdge } from './edgeRouting';
 import { layoutLayers, type LayoutBox, type LayoutSettings } from './sugiyama';
 
 type Scope = string | null;
@@ -76,6 +76,7 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
   }
 
   const layouts = new Map<Scope, ReturnType<typeof layoutLayers>>();
+  const insets = new Map<string, Point>();
   const regionPadding = settings.regionPadding;
   function arrange(scope: Scope) {
     const level = levels.get(scope)!;
@@ -83,9 +84,13 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
       arrange(region.id);
       const inner = layouts.get(region.id)!;
       const diameter = region.collapsed ? 2 * (region.collapsedRadius ?? 36) : 0;
+      const crossPadding = inner.feedback.size ? Math.max(regionPadding,
+        feedbackLaneOffset(inner.feedback.size - 1, regionPadding) + Math.min(5, regionPadding / 2)) : regionPadding;
+      const inset = settings.direction === 'LR' ? { x: regionPadding, y: crossPadding } : { x: crossPadding, y: regionPadding };
+      insets.set(region.id, inset);
       level.sizes.set(regionKey(region.id), {
-        width: Math.max(diameter, Math.max(1, inner.width) + 2 * regionPadding),
-        height: Math.max(diameter, Math.max(1, inner.height) + 2 * regionPadding),
+        width: Math.max(diameter, Math.max(1, inner.width) + 2 * inset.x),
+        height: Math.max(diameter, Math.max(1, inner.height) + 2 * inset.y),
       });
     }
     layouts.set(scope, layoutLayers(level.sizes, level.edges, settings));
@@ -99,7 +104,8 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     for (const [key, box] of layouts.get(scope)!.boxes) absolute.set(key, position(box, offset));
     for (const child of levels.get(scope)!.children) {
       const box = absolute.get(regionKey(child.id))!;
-      flatten(child.id, { x: box.x + regionPadding, y: box.y + regionPadding });
+      const inset = insets.get(child.id)!;
+      flatten(child.id, { x: box.x + inset.x, y: box.y + inset.y });
     }
   }
   flatten(null, { x: 0, y: 0 });
