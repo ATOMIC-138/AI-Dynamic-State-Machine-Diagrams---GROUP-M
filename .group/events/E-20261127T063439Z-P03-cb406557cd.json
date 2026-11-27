@@ -1,0 +1,49 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T063439Z-P03-cb406557cd",
+  "event_type": "change_published",
+  "group_id": "GROUP-M",
+  "person_id": "P03",
+  "created_at": "2026-11-27T06:34:39.480996Z",
+  "related_events": [],
+  "change_id": "C-P03-fb2f67f0c4",
+  "branch": "people/P03/interactive-editor",
+  "commit": "faa5f3827cdc6bb42f1c0c06cfe35f8c18335cff",
+  "summary": "用匯入按鈕開到本工具存檔時原樣還原、不重新排版；移除剩下的假實作（內建假範例、STUB 標籤與樣式）。附 2 項測試。",
+  "base_commit": "d68ef13099fa9d1c3549cead6ec692fb8dfdec07",
+  "files_changed": [
+    "src/App.tsx",
+    "src/editor/presets.ts",
+    "src/editor/session.ts",
+    "src/index.css",
+    "src/ui/MetricsPanel.tsx",
+    "tests/editor/rendering.test.tsx",
+    "tests/editor/session.test.ts"
+  ],
+  "interface_changes": [],
+  "tests_run": [
+    "[\"C:\\\\msys64\\\\ucrt64\\\\bin\\\\python.exe\", \"scripts/run_checks.py\"]"
+  ],
+  "known_issues": [
+    "圖大到縮到最小縮放 20% 仍放不下時，「符合畫面」仍會超出畫面。",
+    "很大的圖（200 個狀態）拖曳時有明顯延遲，約 0.4 秒。",
+    "backend.ts 的 isStubBackend（恆為 false）保留，因 tests/integration/endToEnd.test.ts 引用它。"
+  ],
+  "proposed_for_integration": true,
+  "validation": {
+    "automated_result": "pass",
+    "results": [
+      {
+        "argv": [
+          "C:\\msys64\\ucrt64\\bin\\python.exe",
+          "scripts/run_checks.py"
+        ],
+        "exit_code": 0,
+        "stdout": "[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run typecheck\n\n> state-machine-diagram-layout-editor@0.1.0 typecheck\n> tsc --noEmit\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd test\n\n> state-machine-diagram-layout-editor@0.1.0 test\n> vitest run\n\n\n RUN  v3.2.7 C:/Users/User/AppData/Local/Temp/groupctl-test-jw4hgfhb/checkout\n\n ✓ tests/model/contract.test.ts (1 test) 2ms\n ✓ tests/editor/geometry.test.ts (8 tests) 7ms\n ✓ tests/model/model.test.ts (13 tests) 10ms\n ✓ tests/metrics/metrics.test.ts (12 tests) 10ms\n ✓ tests/editor/openRequests.test.ts (1 test) 2ms\n ✓ tests/layout/layout.test.ts (22 tests) 32ms\n ✓ tests/integration/endToEnd.test.ts (3 tests) 28ms\n ✓ tests/editor/editorActions.test.ts (9 tests) 10ms\n ✓ tests/editor/rendering.test.tsx (5 tests) 17ms\n ✓ tests/editor/session.test.ts (8 tests) 25ms\n\n Test Files  10 passed (10)\n      Tests  82 passed (82)\n   Start at  14:34:32\n   Duration  799ms (transform 531ms, setup 0ms, collect 1.77s, tests 144ms, environment 2ms, prepare 1.95s)\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run build\n\n> state-machine-diagram-layout-editor@0.1.0 build\n> tsc --noEmit && vite build\n\nvite v6.4.6 building for production...\ntransforming...\n✓ 54 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                   0.44 kB │ gzip:  0.30 kB\ndist/assets/index-B1fpRr0o.css    3.29 kB │ gzip:  1.24 kB\ndist/assets/index-C-1ub9j7.js   278.31 kB │ gzip: 88.78 kB\n✓ built in 672ms\n",
+        "stderr": "",
+        "counts": null,
+        "evidence_state": "pass"
+      }
+    ]
+  }
+}
