@@ -1,0 +1,30 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T070407Z-P03-8972f93b69",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P03",
+  "created_at": "2026-11-27T07:04:07.549193Z",
+  "related_events": [
+    "E-20261127T064410Z-P01-c359373ac8"
+  ],
+  "change_id": "C-P01-c2344bbeac",
+  "verdict": "accept",
+  "summary": "接受。A 的 2ce4e97 解決了 main 測試時提出的 Demo 圖看不到改善、nested 圖字太小、大圖拖曳卡頓與「符合畫面」放不下：nested 主圖現在 4 → 2（減少 50%），圖形由 2104×245 變 1444×445，200 個狀態拖曳明顯順暢且能整張顯示。拖曳期間 Metrics Panel 不更新，放開後才更新（刻意的取捨）。本次修改也動到 C 負責的檔案（App.tsx、editor/backend.ts、editor/geometry.ts、editor/useDiagramInteraction.ts、tests/editor），一併檢查過，有一個不阻擋的縮放問題。本審查由 Claude（AI）代 P03 讀 diff 與執行測試；瀏覽器操作是 AI 模擬，不能代替 FINAL 要求的真人確認。",
+  "issues": [
+    "[建議，不阻擋] 大圖「符合畫面」後倍率低於 20%（200 個狀態約 14.5%）時，用滾輪放大後就縮不回整張圖，要再按一次「符合畫面」。原因是 zoomAt 的下限改成跟著目前倍率走（src/editor/geometry.ts）。"
+  ],
+  "tests_run": [
+    "scripts/run_checks.py（main 886ab30，程式內容與 2ce4e97 相同）：typecheck、84 項測試、build 通過",
+    "新舊 metrics 比對（d68ef13 與 2ce4e97）：61794 份隨機與排版輸出文件，所有指標完全相同",
+    "nested-regions：baseline 4 → optimized 2，與獨立交叉計數一致；節點重疊 0、沒有連線穿過其他狀態；3 個區域分別收合再展開，畫面還原",
+    "瀏覽器（AI 模擬滑鼠）走完 10 步 Demo：通過；用 Import External JSON 開存檔仍原樣還原",
+    "200 個狀態拖曳（dev server、背景分頁，各 24 次移動）：每次移動中位時間 d68ef13 221 ms → 2ce4e97 9 ms"
+  ],
+  "inspected_commit": "2ce4e97dd7a4eb4cf0bfa5b774f0473686364fe9",
+  "evidence": [
+    "滾輪縮放：符合畫面 0.145 → 放大 0.265 → 連續縮小停在 0.200 → 按「符合畫面」回到 0.145",
+    "200 個狀態單次 evaluateLayout 約 101 ms → 46 ms，交叉數同為 1661",
+    "存檔時面板指標（4、0、8916、12）與用存檔重新計算的結果相同"
+  ]
+}
