@@ -1,0 +1,31 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T054950Z-P03-ca9d29b5b9",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P03",
+  "created_at": "2026-11-27T05:49:50.125403Z",
+  "related_events": [
+    "E-20261127T053918Z-P02-440c412b96"
+  ],
+  "change_id": "C-P02-99b9a531df",
+  "verdict": "accept",
+  "summary": "B 的 bfbddec 修好了先前審查 E-20261127T051950Z-P03-d2a21151ec 的 3 項：平行轉移不再折返，節點位置相同時交叉不再變多，保護條件不再丟掉較好的排版；整體也比上一個穩定版 4b52d8c 好。typecheck、23 項測試、build 通過。接受此版本。本次審查由 Claude（AI）代 P03 讀 diff 與執行測試。",
+  "issues": [
+    "[建議，不阻擋] 密集的圖仍偶爾有箭頭整條被其他箭頭蓋住（12 個狀態／18 條轉移的 300 張圖有 15 張；4b52d8c 是 17 張），都是非回頭邊。"
+  ],
+  "tests_run": [
+    "npm run typecheck、npm test（23 passed）、npm run build（bfbddec 的獨立副本）：通過",
+    "併入 A 的 612cc76 與 C 的移除假實作版本：77 項測試與 build 通過",
+    "1500 張隨機圖：沒有重疊、超出區域、穿過狀態或區域、當掉；14286 條區域內部箭頭沒有跑出區域框",
+    "13144 條箭頭（含大小不一的狀態）沒有穿回自己的起訖方框；2058 條平行箭頭沒有折返",
+    "B 的 routeCrossings 與獨立參考算法在 44437 組箭頭配對上完全一致",
+    "與 4b52d8c 用相同輸入比較交叉數（A 的 bc493c5 evaluateLayout）"
+  ],
+  "inspected_commit": "bfbddece608f73b66b8e1f914bbe8e7241b0457e",
+  "evidence": [
+    "2 個狀態、2 條 a>b 的轉折點 (123.2,18.3)(216.8,18.3)，與 4b52d8c 相同",
+    "交叉合計：3000 張隨機圖 4b52d8c 13257 → bfbddec 12857；節點位置相同的 1500 張 baseline 5651 → 5279；丟掉較好排版的情況 0/3000（f0b6acd 為 54）",
+    "4 個 fixtures（LR）baseline → 最佳化：linear 0→0、cycles 8→3、high-crossing 31→1、nested 0→0"
+  ]
+}
