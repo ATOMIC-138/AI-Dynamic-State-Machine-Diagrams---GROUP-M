@@ -1,0 +1,24 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T064408Z-P02-19785a8ac5",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P02",
+  "created_at": "2026-11-27T06:44:08.071488Z",
+  "related_events": [
+    "E-20261127T063439Z-P03-cb406557cd"
+  ],
+  "change_id": "C-P03-fb2f67f0c4",
+  "verdict": "accept",
+  "summary": "已驗證從匯入按鈕開啟本工具的存檔會完整還原，不會重新排版；一般外部 JSON 仍會執行正式排版。介面只顯示小組的正式範例。接受此修正版。",
+  "issues": [],
+  "tests_run": [
+    "在提案的精確 commit 執行 scripts/run_checks.py，型別檢查、82 項原有測試及建置均通過。",
+    "另執行 3 項匯入按鈕測試。完整比較匯入前後的巢狀存檔，包含手動位置、收合圓、新增節點及轉折點；確認一般外部圖仍會排版、損壞的存檔會顯示錯誤，以及介面列出 4 份正式範例。全部通過。"
+  ],
+  "inspected_commit": "faa5f3827cdc6bb42f1c0c06cfe35f8c18335cff",
+  "evidence": [
+    "使用 groupctl inspect C-P03-fb2f67f0c4 核對本次提案底版 d68ef13099fa9d1c3549cead6ec692fb8dfdec07 與 7 個變更檔案。",
+    "已核對本版本的編輯器使用 P01 的資料模型與指標及 P02 的正式排版引擎。"
+  ]
+}

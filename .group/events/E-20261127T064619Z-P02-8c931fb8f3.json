@@ -1,0 +1,16 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T064619Z-P02-8c931fb8f3",
+  "event_type": "finding",
+  "group_id": "GROUP-M",
+  "person_id": "P02",
+  "created_at": "2026-11-27T06:46:19.539246Z",
+  "related_events": [
+    "E-20261126T142601Z-P02-b96e47f170"
+  ],
+  "summary": "Resolution recorded: 已複查 P03 修正版 C-P03-f474d15ee4，開檔順序與符合畫面兩項問題均已修正，修正已合併至 main。",
+  "evidence": [],
+  "resolves_events": [
+    "E-20261126T142601Z-P02-b96e47f170"
+  ]
+}

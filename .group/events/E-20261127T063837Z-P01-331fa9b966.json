@@ -1,0 +1,20 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T063837Z-P01-331fa9b966",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-27T06:38:37.758150Z",
+  "related_events": [
+    "E-20261127T063439Z-P03-cb406557cd"
+  ],
+  "change_id": "C-P03-fb2f67f0c4",
+  "verdict": "accept",
+  "summary": "Reviewed P03 saved-file import safeguard and stub cleanup (faa5f38). Cleanly restores saved documents without relayout even via Import External JSON and removes unused stub samples/UI.",
+  "issues": [],
+  "tests_run": [],
+  "inspected_commit": "faa5f3827cdc6bb42f1c0c06cfe35f8c18335cff",
+  "evidence": [
+    "Inspected full diff of C-P03-fb2f67f0c4 across src/{App.tsx,index.css,editor/presets.ts,editor/session.ts,ui/MetricsPanel.tsx} and tests/editor/{rendering.test.tsx,session.test.ts}; 82/82 tests pass."
+  ]
+}

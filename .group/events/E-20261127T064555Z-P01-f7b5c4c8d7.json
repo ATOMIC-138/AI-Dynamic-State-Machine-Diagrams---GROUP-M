@@ -1,0 +1,16 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T064555Z-P01-f7b5c4c8d7",
+  "event_type": "finding",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-27T06:45:55.383345Z",
+  "related_events": [
+    "E-20261126T142911Z-P03-ec6732214a"
+  ],
+  "summary": "Resolution recorded: Superseded by P03's corrected review E-20261126T143334Z-P03-434a26ab29 and fully resolved in C-P02-99b9a531df (accepted by P03 in E-20261127T054950Z-P03-ca9d29b5b9) and integrated into main.",
+  "evidence": [],
+  "resolves_events": [
+    "E-20261126T142911Z-P03-ec6732214a"
+  ]
+}
