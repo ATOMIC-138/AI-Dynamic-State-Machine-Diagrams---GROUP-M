@@ -77,12 +77,12 @@ describe('MetricsPanel', () => {
       crossingReductionCount: 6,
       crossingReductionPercent: 75,
     };
-    const html = renderToStaticMarkup(<MetricsPanel current={metrics} comparison={comparison} isStub={false} />);
+    const html = renderToStaticMarkup(<MetricsPanel current={metrics} comparison={comparison} />);
     expect(html).toContain('交叉減少 6（75.0%）');
   });
 
   it('explains why there is no comparison after loading a saved file', () => {
-    const html = renderToStaticMarkup(<MetricsPanel current={metrics} comparison={null} isStub={false} />);
+    const html = renderToStaticMarkup(<MetricsPanel current={metrics} comparison={null} />);
     expect(html).toContain('載入儲存檔不會執行排版');
   });
 });

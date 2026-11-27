@@ -1,7 +1,4 @@
-/**
- * Written against `backend`, so after the stubs are swapped out these double as
- * integration checks of Members A and B.
- */
+/** Written against `backend`, so these double as integration checks of Members A and B. */
 import { describe, expect, it } from 'vitest';
 import { backend } from '../../src/editor/backend';
 import { createState } from '../../src/editor/editorActions';
@@ -44,6 +41,20 @@ describe('opening documents', () => {
 
   it('rejects JSON that is not a saved document', () => {
     expect(() => openSavedDocument('{"nodes":[]}')).toThrow();
+  });
+
+  it('restores a saved file even when it is opened as external input, and says so', () => {
+    const edited = backend.moveNode(backend.toggleRegionCollapse(sampleDoc(), 'work', true), 'work', 7, 9);
+    const opened = openExternalGraph(backend.exportDocument(edited));
+    expect(saved(opened.doc)).toEqual(saved(edited));
+    expect(opened.comparison).toBeNull();
+    expect(opened.notice).toContain('原樣還原');
+  });
+
+  it('still lays out external input that only mentions a schema version', () => {
+    const opened = openExternalGraph('{"schemaVersion":"1.0","nodes":[{"id":"a"}],"edges":[]}');
+    expect(opened.comparison).not.toBeNull();
+    expect(opened.notice).toBeUndefined();
   });
 
   it('can open every preset', () => {
