@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { backend, isStubBackend } from './editor/backend';
+import { backend } from './editor/backend';
 import { DiagramCanvas } from './editor/DiagramCanvas';
 import { openPreset, presets } from './editor/presets';
 import {
@@ -34,7 +34,7 @@ export function App() {
       setComparison(opened.comparison);
       editor.reset();
       editor.fitToView(opened.doc);
-      notify(`${action}完成。`);
+      notify(opened.notice ?? `${action}完成。`);
     } catch (error) {
       fail(action, error);
     }
@@ -84,7 +84,6 @@ export function App() {
     <div className="app-shell">
       <header className="app-header">
         <h1>State Machine Diagram Layout Editor</h1>
-        {isStubBackend && <span className="stub-badge">STUB 模式</span>}
       </header>
       <Toolbar
         presetNames={presets.map((preset) => preset.name)}
@@ -118,7 +117,7 @@ export function App() {
             </div>
           )}
         </section>
-        <MetricsPanel current={metrics} comparison={comparison} isStub={isStubBackend} />
+        <MetricsPanel current={metrics} comparison={comparison} />
       </main>
       <footer className="status-bar">
         <span role="status" className={status.isError ? 'error' : undefined}>

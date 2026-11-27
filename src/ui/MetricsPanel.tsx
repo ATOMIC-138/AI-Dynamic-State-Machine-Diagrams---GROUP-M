@@ -3,7 +3,6 @@ import type { LayoutComparison, LayoutMetrics } from '../types/graph';
 export interface MetricsPanelProps {
   current: LayoutMetrics | null;
   comparison: LayoutComparison | null;
-  isStub: boolean;
 }
 
 const ROWS: { key: keyof LayoutMetrics; label: string }[] = [
@@ -18,7 +17,7 @@ function reductionSummary({ crossingReductionCount: count, crossingReductionPerc
   return `交叉${direction} ${Math.abs(count)}（${Math.abs(percent).toFixed(1)}%）`;
 }
 
-export function MetricsPanel({ current, comparison, isStub }: MetricsPanelProps) {
+export function MetricsPanel({ current, comparison }: MetricsPanelProps) {
   return (
     <aside className="metrics-panel" aria-label="排版數據">
       <h2>目前圖形</h2>
@@ -64,8 +63,6 @@ export function MetricsPanel({ current, comparison, isStub }: MetricsPanelProps)
       ) : (
         <p className="hint">載入範例、匯入外部 JSON 或按 Auto Layout 後顯示。載入儲存檔不會執行排版。</p>
       )}
-
-      {isStub && <p className="stub-note">目前使用假實作（src/editor/stubs.ts），排版與數字只供介面開發。</p>}
     </aside>
   );
 }

@@ -32,15 +32,6 @@ body {
   font-size: 1.05rem;
 }
 
-.stub-badge,
-.stub-note {
-  background: #fef3c7;
-  color: #92400e;
-  border-radius: 6px;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.75rem;
-}
-
 /* Toolbar */
 
 .toolbar {
