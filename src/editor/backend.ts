@@ -42,5 +42,3 @@ export const backend: Backend = {
   ...metrics,
   ...layout,
 };
-
-export const isStubBackend: boolean = false;

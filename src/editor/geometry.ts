@@ -24,6 +24,7 @@ export interface DrawnEdge {
 }
 
 const MIN_SCALE = 0.2;
+const MIN_FIT_SCALE = 0.02;
 const MAX_SCALE = 4;
 const SELF_LOOP_HEIGHT = 36;
 
@@ -44,7 +45,8 @@ export function screenToWorld(view: Viewport, point: Point): Point {
 
 /** Zoom while the world point under `anchor` (screen coordinates) stays put. */
 export function zoomAt(view: Viewport, anchor: Point, factor: number): Viewport {
-  const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * factor));
+  const minScale = Math.min(MIN_SCALE, view.scale);
+  const scale = Math.min(MAX_SCALE, Math.max(minScale, view.scale * factor));
   const world = screenToWorld(view, anchor);
   return { scale, x: anchor.x - world.x * scale, y: anchor.y - world.y * scale };
 }
@@ -57,7 +59,7 @@ export function fitViewport(boxes: Box[], width: number, height: number, padding
   const contentWidth = Math.max(1, Math.max(...boxes.map((box) => box.x + box.width)) - left);
   const contentHeight = Math.max(1, Math.max(...boxes.map((box) => box.y + box.height)) - top);
   const scale = Math.max(
-    MIN_SCALE,
+    MIN_FIT_SCALE,
     Math.min(1, (width - padding * 2) / contentWidth, (height - padding * 2) / contentHeight),
   );
   return {

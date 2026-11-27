@@ -368,6 +368,34 @@ describe('Objective Layout Metrics Evaluator', () => {
     };
     expect(evaluateLayout(multiSegSameSide).edgeCrossings).toBe(0);
   });
+
+  it('evaluates a 200-node / 300-edge graph quickly via AABB pre-rejection', () => {
+    const nodes = Array.from({ length: 200 }, (_, i) => ({
+      id: `n${i}`,
+      x: (i % 20) * 200,
+      y: Math.floor(i / 20) * 120,
+      width: 120,
+      height: 50,
+      regionId: null,
+    }));
+    const edges = Array.from({ length: 300 }, (_, i) => ({
+      id: `e${i}`,
+      source: `n${i % 199}`,
+      target: `n${(i + 1 + (i % 3)) % 200}`,
+      waypoints: [],
+    }));
+    const start = performance.now();
+    const res = evaluateLayout({
+      schemaVersion: '1.0',
+      layoutApplied: true,
+      nodes,
+      edges,
+      regions: [],
+    });
+    const elapsedMs = performance.now() - start;
+    expect(res.nodeOverlaps).toBe(0);
+    expect(elapsedMs).toBeLessThan(150);
+  });
 });
 
 describe('Benchmark & Demo Fixtures Validation', () => {

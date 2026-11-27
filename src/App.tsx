@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { backend } from './editor/backend';
 import { DiagramCanvas } from './editor/DiagramCanvas';
 import { openPreset, presets } from './editor/presets';
@@ -10,7 +10,7 @@ import {
   type OpenedDocument,
 } from './editor/session';
 import { useDiagramInteraction } from './editor/useDiagramInteraction';
-import type { LayoutComparison, StateMachineDocument } from './types/graph';
+import type { LayoutComparison, LayoutMetrics, StateMachineDocument } from './types/graph';
 import { MetricsPanel } from './ui/MetricsPanel';
 import { Toolbar } from './ui/Toolbar';
 
@@ -22,7 +22,20 @@ export function App() {
   const [status, setStatus] = useState({ text: '載入範例或匯入 JSON 開始。', isError: false });
   const notify = useCallback((text: string) => setStatus({ text, isError: false }), []);
   const editor = useDiagramInteraction(doc, setDoc, notify);
-  const metrics = useMemo(() => (doc ? backend.evaluateLayout(doc) : null), [doc]);
+  const lastMetrics = useRef<LayoutMetrics | null>(null);
+  // Defer O(E^2) metric recomputation while actively dragging so large graphs stay responsive.
+  const metrics = useMemo(() => {
+    if (!doc) {
+      lastMetrics.current = null;
+      return null;
+    }
+    if (editor.isDragging && lastMetrics.current) {
+      return lastMetrics.current;
+    }
+    const evaluated = backend.evaluateLayout(doc);
+    lastMetrics.current = evaluated;
+    return evaluated;
+  }, [doc, editor.isDragging]);
 
   const fail = (action: string, error: unknown) =>
     setStatus({ text: `${action}失敗：${error instanceof Error ? error.message : String(error)}`, isError: true });

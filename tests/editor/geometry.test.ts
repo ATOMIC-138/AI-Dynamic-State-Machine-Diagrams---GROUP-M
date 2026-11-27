@@ -71,6 +71,23 @@ describe('viewport', () => {
     expect(bendOnScreen).toBeGreaterThanOrEqual(0);
     expect(bendOnScreen).toBeLessThanOrEqual(300);
   });
+
+  it('shrinks below 0.2 when fitting a very large graph so all nodes stay in view', () => {
+    const huge = Array.from({ length: 200 }, (_, i) => ({
+      x: i * 180,
+      y: (i % 5) * 120,
+      width: 120,
+      height: 50,
+    }));
+    const view = fitViewport(huge, 1000, 600);
+    expect(view.scale).toBeLessThan(0.2);
+    const rightmostOnScreen = (199 * 180 + 120) * view.scale + view.x;
+    expect(rightmostOnScreen).toBeLessThanOrEqual(1000);
+    // Zooming out from an already-tiny fit stays at current scale without jumping up
+    expect(zoomAt(view, { x: 500, y: 300 }, 0.5).scale).toBe(view.scale);
+    // Zooming in smoothly increases scale
+    expect(zoomAt(view, { x: 500, y: 300 }, 2).scale).toBeGreaterThan(view.scale);
+  });
 });
 
 describe('edges', () => {

@@ -8,22 +8,24 @@
     { "id": "exec", "label": "Executing" },
     { "id": "retry", "label": "RetryWait" },
     { "id": "verify", "label": "Verifying" },
-    { "id": "done", "label": "Done" },
-    { "id": "error", "label": "Error" }
+    { "id": "error", "label": "Error" },
+    { "id": "done", "label": "Done" }
   ],
   "edges": [
-    { "id": "e1", "source": "boot", "target": "auth_check", "label": "init" },
-    { "id": "e2", "source": "auth_check", "target": "mfa", "label": "challenge" },
-    { "id": "e3", "source": "mfa", "target": "queue", "label": "verified" },
-    { "id": "e4", "source": "auth_check", "target": "error", "label": "denied" },
-    { "id": "e5", "source": "queue", "target": "parse", "label": "dispatch" },
-    { "id": "e6", "source": "parse", "target": "exec", "label": "ok" },
-    { "id": "e7", "source": "exec", "target": "retry", "label": "transient_err" },
-    { "id": "e8", "source": "retry", "target": "parse", "label": "reparse" },
-    { "id": "e9", "source": "exec", "target": "verify", "label": "finish" },
-    { "id": "e10", "source": "verify", "target": "done", "label": "pass" },
-    { "id": "e11", "source": "verify", "target": "error", "label": "fail" },
-    { "id": "e12", "source": "error", "target": "boot", "label": "reset" }
+    { "id": "e1", "source": "boot", "target": "mfa", "label": "sso" },
+    { "id": "e2", "source": "boot", "target": "auth_check", "label": "login" },
+    { "id": "e3", "source": "auth_check", "target": "error", "label": "denied" },
+    { "id": "e4", "source": "auth_check", "target": "queue", "label": "enqueue" },
+    { "id": "e5", "source": "mfa", "target": "parse", "label": "fast" },
+    { "id": "e6", "source": "parse", "target": "exec", "label": "run" },
+    { "id": "e7", "source": "parse", "target": "retry", "label": "backoff" },
+    { "id": "e8", "source": "retry", "target": "parse", "label": "retry" },
+    { "id": "e9", "source": "queue", "target": "verify", "label": "audit" },
+    { "id": "e10", "source": "exec", "target": "verify", "label": "finish" },
+    { "id": "e11", "source": "retry", "target": "verify", "label": "fallback" },
+    { "id": "e12", "source": "verify", "target": "done", "label": "pass" },
+    { "id": "e13", "source": "verify", "target": "error", "label": "fail" },
+    { "id": "e14", "source": "error", "target": "boot", "label": "reset" }
   ],
   "regions": [
     {

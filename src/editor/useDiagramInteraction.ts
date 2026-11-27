@@ -48,6 +48,8 @@ export function useDiagramInteraction(
 ) {
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<Drag | null>(null);
+  const draggingDocRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, scale: 1 });
   const [mode, setModeState] = useState<Mode>('select');
   const [pendingSource, setPendingSource] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export function useDiagramInteraction(
 
   const reset = useCallback(() => {
     drag.current = null;
+    draggingDocRef.current = false;
+    setIsDragging(false);
     setMode('select');
     setSelection(null);
   }, [setMode]);
@@ -97,6 +101,10 @@ export function useDiagramInteraction(
         setViewport({ ...current.view, x: current.view.x + dx, y: current.view.y + dy });
         return;
       }
+      if (!draggingDocRef.current) {
+        draggingDocRef.current = true;
+        setIsDragging(true);
+      }
       const moved = (point: Point) => ({
         x: point.x + dx / current.view.scale,
         y: point.y + dy / current.view.scale,
@@ -115,9 +123,17 @@ export function useDiagramInteraction(
     const finish = (event: PointerEvent) => {
       apply(event);
       drag.current = null;
+      if (draggingDocRef.current) {
+        draggingDocRef.current = false;
+        setIsDragging(false);
+      }
     };
     const abort = () => {
       drag.current = null;
+      if (draggingDocRef.current) {
+        draggingDocRef.current = false;
+        setIsDragging(false);
+      }
     };
     window.addEventListener('pointermove', apply);
     window.addEventListener('pointerup', finish);
@@ -286,6 +302,7 @@ export function useDiagramInteraction(
     svgRef,
     graph,
     viewport,
+    isDragging,
     mode,
     setMode,
     pendingSource,

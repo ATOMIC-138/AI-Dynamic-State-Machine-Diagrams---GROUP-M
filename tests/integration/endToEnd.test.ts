@@ -3,14 +3,13 @@ import cyclesFeedback from '../../fixtures/cycles-feedback.json';
 import highCrossing from '../../fixtures/high-crossing.json';
 import linearBranch from '../../fixtures/linear-branch.json';
 import nestedRegions from '../../fixtures/nested-regions.json';
-import { backend, isStubBackend } from '../../src/editor/backend';
+import { backend } from '../../src/editor/backend';
 import { openPreset, presets } from '../../src/editor/presets';
 import { openExternalGraph, openSavedDocument } from '../../src/editor/session';
 import type { ExternalGraphInput } from '../../src/types/graph';
 
 describe('Full A + B + C End-to-End Integration', () => {
-  it('uses the real integrated Member A + Member B backend (not stubs)', () => {
-    expect(isStubBackend).toBe(false);
+  it('auto-discovers all 4 Member A fixtures with the real backend', () => {
     expect(presets.map((p) => p.name).sort()).toEqual([
       'cycles-feedback.json',
       'high-crossing.json',
@@ -40,6 +39,10 @@ describe('Full A + B + C End-to-End Integration', () => {
         expect(opened.comparison!.baseline.edgeCrossings).toBeGreaterThanOrEqual(29);
         expect(opened.comparison!.optimized.edgeCrossings).toBeLessThanOrEqual(1);
         expect(opened.comparison!.crossingReductionPercent).toBeGreaterThan(90);
+      }
+      if (name === 'nested-regions.json') {
+        expect(opened.comparison!.crossingReductionCount).toBeGreaterThan(0);
+        expect(opened.comparison!.optimized.boundingWidth).toBeLessThan(1600);
       }
     }
   });

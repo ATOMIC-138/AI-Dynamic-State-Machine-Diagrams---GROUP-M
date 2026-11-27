@@ -526,7 +526,14 @@ export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
   }
 
   // 2. Build edge polylines, compute totalEdgeLength and totalBends
-  const polylines: Point[][] = [];
+  interface BoundedPolyline {
+    points: Point[];
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  }
+  const polylines: BoundedPolyline[] = [];
   let totalEdgeLength = 0;
   let totalBends = 0;
 
@@ -583,14 +590,35 @@ export function evaluateLayout(doc: StateMachineDocument): LayoutMetrics {
       }
     }
 
-    polylines.push(polyline);
+    const simplified = simplifyPolyline(polyline);
+    let pMinX = Number.POSITIVE_INFINITY;
+    let pMinY = Number.POSITIVE_INFINITY;
+    let pMaxX = Number.NEGATIVE_INFINITY;
+    let pMaxY = Number.NEGATIVE_INFINITY;
+    for (const p of simplified) {
+      if (p.x < pMinX) pMinX = p.x;
+      if (p.y < pMinY) pMinY = p.y;
+      if (p.x > pMaxX) pMaxX = p.x;
+      if (p.y > pMaxY) pMaxY = p.y;
+    }
+    polylines.push({ points: simplified, minX: pMinX, minY: pMinY, maxX: pMaxX, maxY: pMaxY });
   }
 
-  // 3. Edge crossings across all distinct edge pairs
+  // 3. Edge crossings across all distinct edge pairs (with O(1) AABB pre-rejection)
   let edgeCrossings = 0;
   for (let i = 0; i < polylines.length; i++) {
+    const a = polylines[i];
     for (let j = i + 1; j < polylines.length; j++) {
-      edgeCrossings += countPolylineCrossings(polylines[i], polylines[j]);
+      const b = polylines[j];
+      if (
+        a.maxX < b.minX - EPS ||
+        b.maxX < a.minX - EPS ||
+        a.maxY < b.minY - EPS ||
+        b.maxY < a.minY - EPS
+      ) {
+        continue;
+      }
+      edgeCrossings += countPolylineCrossings(a.points, b.points);
     }
   }
 
