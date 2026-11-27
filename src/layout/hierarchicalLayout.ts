@@ -1,5 +1,6 @@
 import type { LayoutResult, Point, RegionNode, StateMachineDocument, TransitionEdge } from '../types/graph';
-import { center, countRouteCrossings, feedbackLaneOffset, routeEdge } from './edgeRouting';
+import { center, feedbackLaneOffset, routeEdge, selfLoopReach } from './edgeRouting';
+import { countRouteCrossings } from './routeCrossings';
 import { layoutLayers, type LayoutBox, type LayoutSettings } from './sugiyama';
 
 type Scope = string | null;
@@ -75,6 +76,14 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     group.forEach((id, index) => parallelLanes.set(id, { index, count: group.length }));
   }
 
+  const loopReaches = new Map<Scope, number>();
+  for (const edge of doc.edges) {
+    const scope = edgeScopes.get(edge.id);
+    if (edge.source !== edge.target || scope === undefined) continue;
+    const reach = selfLoopReach(parallelLanes.get(edge.id)!.count, settings);
+    loopReaches.set(scope, Math.max(loopReaches.get(scope) ?? 0, reach));
+  }
+
   const layouts = new Map<Scope, ReturnType<typeof layoutLayers>>();
   const insets = new Map<string, Point>();
   const regionPadding = settings.regionPadding;
@@ -85,7 +94,8 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
       const inner = layouts.get(region.id)!;
       const diameter = region.collapsed ? 2 * (region.collapsedRadius ?? 36) : 0;
       const crossPadding = inner.feedback.size ? Math.max(regionPadding,
-        feedbackLaneOffset(inner.feedback.size - 1, regionPadding) + Math.min(5, regionPadding / 2)) : regionPadding;
+        feedbackLaneOffset(inner.feedback.size - 1, regionPadding, loopReaches.get(region.id) ?? 0)
+          + Math.min(5, regionPadding / 2)) : regionPadding;
       const inset = settings.direction === 'LR' ? { x: regionPadding, y: crossPadding } : { x: crossPadding, y: regionPadding };
       insets.set(region.id, inset);
       level.sizes.set(regionKey(region.id), {
@@ -110,9 +120,11 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
   }
   flatten(null, { x: 0, y: 0 });
 
-  const feedbackLanes = new Map<string, { index: number; count: number }>();
-  for (const layout of layouts.values()) {
-    [...layout.feedback].forEach((id, index) => feedbackLanes.set(id, { index, count: layout.feedback.size }));
+  const feedbackLanes = new Map<string, { index: number; count: number; loopReach: number }>();
+  for (const [scope, layout] of layouts) {
+    [...layout.feedback].forEach((id, index) => feedbackLanes.set(id, {
+      index, count: layout.feedback.size, loopReach: loopReaches.get(scope) ?? 0,
+    }));
   }
   const reversedEdgeIds: string[] = [];
   const paths = new Map<string, Point[]>();
@@ -151,11 +163,11 @@ export function layoutHierarchy(doc: StateMachineDocument, settings: LayoutSetti
     const original = paths.get(edge.id)!;
     const others = [...paths].filter(([id]) => id !== edge.id).map(([, path]) => path);
     const before = countRouteCrossings(original, others);
-    if (!before.total) continue;
+    if (!before) continue;
     const waypoints = alternate();
     const candidate = [original[0], ...waypoints, original[original.length - 1]];
     const after = countRouteCrossings(candidate, others);
-    if (after.total < before.total && after.segmentInteriors <= before.segmentInteriors) {
+    if (after < before) {
       paths.set(edge.id, candidate);
       edge.waypoints = waypoints;
     }

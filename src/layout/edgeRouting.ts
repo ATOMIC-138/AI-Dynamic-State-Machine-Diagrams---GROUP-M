@@ -2,86 +2,18 @@ import type { Point, TransitionEdge } from '../types/graph';
 import type { LayoutBox, LayoutSettings } from './sugiyama';
 
 const EPSILON = 1e-8;
-const CROSSING_EPSILON = 1e-6;
 const FEEDBACK_LANE_SPACING = 6;
 
-export function feedbackLaneOffset(index: number, padding: number): number {
-  return Math.min(padding / 2, FEEDBACK_LANE_SPACING) + index * FEEDBACK_LANE_SPACING;
+export function feedbackLaneOffset(index: number, padding: number, loopReach: number): number {
+  return Math.max(0.525 * padding, loopReach + FEEDBACK_LANE_SPACING / 2) + index * FEEDBACK_LANE_SPACING;
+}
+
+export function selfLoopReach(count: number, settings: LayoutSettings): number {
+  return Math.min(settings.layerSpacing, settings.nodeSpacing, settings.regionPadding) * (count / (count + 1));
 }
 
 export function center(box: LayoutBox): Point {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
-const sideOf = (a: Point, b: Point, point: Point) =>
-  (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
-const opposite = (a: number, b: number) => (a > CROSSING_EPSILON && b < -CROSSING_EPSILON)
-  || (a < -CROSSING_EPSILON && b > CROSSING_EPSILON);
-
-function insideSegment(point: Point, a: Point, b: Point): boolean {
-  return Math.abs(sideOf(a, b, point)) <= EPSILON
-    && (point.x - a.x) * (point.x - b.x) + (point.y - a.y) * (point.y - b.y) < -EPSILON;
-}
-
-function overlapsAwayFromTerminals(a: Point, b: Point, c: Point, d: Point, terminals: readonly Point[]): boolean {
-  const length = Math.hypot(b.x - a.x, b.y - a.y);
-  if (length <= CROSSING_EPSILON || Math.abs(sideOf(a, b, c)) > CROSSING_EPSILON * length
-    || Math.abs(sideOf(a, b, d)) > CROSSING_EPSILON * length) return false;
-  const along = (point: Point) => ((point.x - a.x) * (b.x - a.x) + (point.y - a.y) * (b.y - a.y)) / length;
-  const from = Math.max(0, Math.min(along(c), along(d)));
-  const to = Math.min(length, Math.max(along(c), along(d)));
-  return to - from > CROSSING_EPSILON && terminals.every((point) => {
-    if (Math.abs(sideOf(a, b, point)) > CROSSING_EPSILON * length) return true;
-    const offset = along(point);
-    return offset < from - CROSSING_EPSILON || offset > to + CROSSING_EPSILON;
-  });
-}
-
-function crossAtSharedWaypoint(point: Point, a: Point, b: Point, c: Point, d: Point): boolean {
-  const angle = (end: Point) => Math.atan2(end.y - point.y, end.x - point.x);
-  const start = Math.min(angle(a), angle(b));
-  const end = Math.max(angle(a), angle(b));
-  const onBoundary = (value: number) => [start, end].some((limit) => {
-    const distance = Math.abs(value - limit);
-    return Math.min(distance, Math.PI * 2 - distance) < EPSILON;
-  });
-  const ca = angle(c);
-  const da = angle(d);
-  return !onBoundary(ca) && !onBoundary(da) && ((ca > start && ca < end) !== (da > start && da < end));
-}
-
-export function countRouteCrossings(path: readonly Point[], others: Iterable<readonly Point[]>) {
-  let segmentInteriors = 0;
-  let waypoints = 0;
-  let possibleContacts = 0;
-  for (const other of others) {
-    const terminals = [path[0], path[path.length - 1], other[0], other[other.length - 1]];
-    for (let i = 1; i < path.length; i++) {
-      const [a, b] = [path[i - 1], path[i]];
-      for (let j = 1; j < other.length; j++) {
-        const [c, d] = [other[j - 1], other[j]];
-        if (Math.max(a.x, b.x) < Math.min(c.x, d.x) || Math.max(c.x, d.x) < Math.min(a.x, b.x)
-          || Math.max(a.y, b.y) < Math.min(c.y, d.y) || Math.max(c.y, d.y) < Math.min(a.y, b.y)) continue;
-        if (opposite(sideOf(a, b, c), sideOf(a, b, d)) && opposite(sideOf(c, d, a), sideOf(c, d, b))) {
-          segmentInteriors++;
-        } else if (i + 1 < path.length && insideSegment(b, c, d)
-          && opposite(sideOf(c, d, a), sideOf(c, d, path[i + 1]))) {
-          waypoints++;
-        } else if (j + 1 < other.length && insideSegment(d, a, b)
-          && opposite(sideOf(a, b, c), sideOf(a, b, other[j + 1]))) {
-          waypoints++;
-        } else if (i + 1 < path.length && j + 1 < other.length
-          && Math.abs(b.x - d.x) < EPSILON && Math.abs(b.y - d.y) < EPSILON
-          && crossAtSharedWaypoint(b, a, path[i + 1], c, other[j + 1])) {
-          waypoints++;
-        } else if (overlapsAwayFromTerminals(a, b, c, d, terminals)) {
-          // An overlap could exchange sides; counting each piece gives a conservative bound.
-          possibleContacts++;
-        }
-      }
-    }
-  }
-  return { total: segmentInteriors + waypoints, segmentInteriors, possibleContacts };
 }
 
 function hitsBox(from: Point, to: Point, box: LayoutBox): boolean {
@@ -230,11 +162,33 @@ function simplify(points: Point[]): Point[] {
   return kept.slice(1, -1);
 }
 
+function connectGuides(points: readonly Point[], padded: readonly LayoutBox[], unpadded: readonly LayoutBox[]): Point[] | undefined {
+  const path = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const bends = detour(points[i - 1], points[i], padded) ?? detour(points[i - 1], points[i], unpadded);
+    if (!bends) return undefined;
+    path.push(...bends, points[i]);
+  }
+  return path;
+}
+
+function staysOutsideTerminals(path: readonly Point[], source: LayoutBox, target: LayoutBox, loop: boolean): boolean {
+  const last = path.length - 1;
+  if (last < 2) return !loop;
+  // The renderer needs a point beyond the outline to clip each arrow to the correct side.
+  if (inside(path[1], padBox(source, 2 * EPSILON)) || inside(path[last - 1], padBox(target, 2 * EPSILON))) return false;
+  for (let i = 1; i <= last; i++) {
+    if (i !== 1 && !(loop && i === last) && hitsBox(path[i - 1], path[i], source)) return false;
+    if (!loop && i !== last && hitsBox(path[i - 1], path[i], target)) return false;
+  }
+  return true;
+}
+
 export function routeEdge(
   edge: TransitionEdge,
   geometry: { source: LayoutBox; target: LayoutBox; guides: readonly Point[]; blockers: readonly LayoutBox[]; bounds: LayoutBox },
   settings: LayoutSettings,
-  lane: { feedback?: Lane; alternateSide?: boolean; parallel: Lane },
+  lane: { feedback?: Lane & { loopReach: number }; alternateSide?: boolean; parallel: Lane },
 ): Point[] {
   const { source, target, guides, blockers, bounds } = geometry;
   const { feedback, alternateSide, parallel } = lane;
@@ -251,8 +205,7 @@ export function routeEdge(
   const breadth = horizontal ? 'height' : 'width';
   const fraction = (item: Lane) => (item.index + 1) / (item.count + 1);
   if (edge.source === edge.target) {
-    const lane = Math.min(settings.layerSpacing, settings.nodeSpacing, settings.regionPadding)
-      * fraction(parallel);
+    const lane = selfLoopReach(parallel.count, settings) * (parallel.index + 1) / parallel.count;
     if (horizontal) {
       const right = source.x + source.width + lane;
       const top = source.y - lane;
@@ -264,7 +217,7 @@ export function routeEdge(
     }
   } else if (feedback) {
     const share = fraction(feedback);
-    const offset = feedbackLaneOffset(feedback.index, settings.regionPadding);
+    const offset = feedbackLaneOffset(feedback.index, settings.regionPadding, feedback.loopReach);
     const gap = Math.min(settings.layerSpacing, settings.regionPadding) * (0.2 + 0.6 * share);
     const rail = alternateSide ? bounds[crossAxis] + bounds[breadth] + offset : bounds[crossAxis] - offset;
     const leave = { ...start, [mainAxis]: source[mainAxis] + source[depth] + gap,
@@ -286,7 +239,12 @@ export function routeEdge(
   }
 
   const loop = edge.source === edge.target;
-  if (!loop && !controls.length && clear(start, end, obstacles)) return [];
+  const availableGuides = controls.filter((point) => obstacles.every((box) => !inside(point, box)));
+  const natural = connectGuides([start, ...availableGuides, end], obstacles, blockers);
+  if (natural) {
+    const waypoints = simplify(natural);
+    if (staysOutsideTerminals([start, ...waypoints, end], source, target, loop)) return waypoints;
+  }
 
   // Only the two center-to-port stubs may cross their own endpoint boxes.
   const margin = clearance / 2;
@@ -295,28 +253,22 @@ export function routeEdge(
   const walls = loop ? [sourceWall] : [sourceWall, targetWall];
   const padded = [...obstacles, ...walls];
   const unpadded = [...blockers, ...walls];
-  const guidesOutside = controls.filter((point) => padded.every((box) => !inside(point, box)));
+  const guidesOutside = availableGuides.filter((point) => walls.every((box) => !inside(point, box)));
   const exitObstacles = loop ? obstacles : [...obstacles, targetWall];
   const entryObstacles = loop ? obstacles : [...obstacles, sourceWall];
   const startDirection = guidesOutside[0] ?? (loop ? controls[0] : end);
   const endDirection = guidesOutside.at(-1) ?? (loop ? controls.at(-1)! : start);
-  const exit = terminalPort(source, startDirection, clearance, exitObstacles)
+  const exit = guidesOutside.length && clear(start, startDirection, exitObstacles) ? startDirection
+    : terminalPort(source, startDirection, clearance, exitObstacles)
     ?? terminalPort(source, startDirection, clearance, loop ? blockers : [...blockers, targetWall]);
-  const entry = terminalPort(target, endDirection, clearance, entryObstacles)
+  const entry = guidesOutside.length && clear(end, endDirection, entryObstacles) ? endDirection
+    : terminalPort(target, endDirection, clearance, entryObstacles)
     ?? terminalPort(target, endDirection, clearance, loop ? blockers : [...blockers, sourceWall]);
   if (!exit || !entry) throw new Error(`No open endpoint for edge ${edge.id}`);
 
-  const points = [exit, ...guidesOutside, entry];
-  const path = [start, exit];
-  for (let i = 1; i < points.length; i++) {
-    const from = points[i - 1];
-    const to = points[i];
-    const bends = detour(from, to, padded) ?? detour(from, to, unpadded);
-    if (!bends) throw new Error(`No route between the endpoints of edge ${edge.id}`);
-    path.push(...bends, to);
-  }
-  path.push(end);
-  return simplify(path);
+  const path = connectGuides([exit, ...guidesOutside.filter((point) => point !== exit && point !== entry), entry], padded, unpadded);
+  if (!path) throw new Error(`No route between the endpoints of edge ${edge.id}`);
+  return simplify([start, ...path, end]);
 }
 
 interface Lane { index: number; count: number }

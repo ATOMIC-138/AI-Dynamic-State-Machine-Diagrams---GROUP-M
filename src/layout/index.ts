@@ -1,6 +1,7 @@
 import type { LayoutOptions, LayoutResult, StateMachineDocument } from '../types/graph';
-import { center, countRouteCrossings } from './edgeRouting';
+import { center } from './edgeRouting';
 import { layoutHierarchy } from './hierarchicalLayout';
+import { countRouteCrossings } from './routeCrossings';
 import type { LayoutSettings } from './sugiyama';
 
 function spacing(value: number | undefined, fallback: number): number {
@@ -14,16 +15,7 @@ function measureCrossings({ nodes, edges }: StateMachineDocument) {
     const end = centers.get(edge.target);
     return start && end ? [[start, ...edge.waypoints, end]] : [];
   });
-  let total = 0;
-  let segmentInteriors = 0;
-  let possibleContacts = 0;
-  routes.forEach((path, index) => {
-    const crossings = countRouteCrossings(path, routes.slice(index + 1));
-    total += crossings.total;
-    segmentInteriors += crossings.segmentInteriors;
-    possibleContacts += crossings.possibleContacts;
-  });
-  return { total, segmentInteriors, possibleContacts };
+  return routes.reduce((total, path, index) => total + countRouteCrossings(path, routes.slice(index + 1)), 0);
 }
 
 export function computeLayout(doc: StateMachineDocument, options: LayoutOptions = {}): LayoutResult {
@@ -41,14 +33,10 @@ export function computeLayout(doc: StateMachineDocument, options: LayoutOptions 
 
   // Layer-order scores cannot see detours or lifted endpoints. Compare the actual routed edges.
   const optimizedCrossings = measureCrossings(optimized.document);
-  const upperBound = optimizedCrossings.total + optimizedCrossings.possibleContacts;
-  if (!upperBound) return optimized;
+  if (!optimizedCrossings) return optimized;
   const baseline = layoutHierarchy(doc, { ...settings, sweepIterations: 0 });
   const baselineCrossings = measureCrossings(baseline.document);
-  // The independent metrics can classify a coincident run as a side swap. Only accept
-  // the candidate when even its conservative upper bound beats or ties the baseline.
-  return upperBound > baselineCrossings.total
-    || optimizedCrossings.segmentInteriors > baselineCrossings.segmentInteriors ? baseline : optimized;
+  return optimizedCrossings > baselineCrossings ? baseline : optimized;
 }
 
 export function computeBaselineLayout(doc: StateMachineDocument, options: LayoutOptions = {}): LayoutResult {

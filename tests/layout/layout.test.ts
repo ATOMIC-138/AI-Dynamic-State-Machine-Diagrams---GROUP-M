@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeBaselineLayout, computeLayout } from '../../src/layout';
-import { countRouteCrossings } from '../../src/layout/edgeRouting';
+import { countRouteCrossings } from '../../src/layout/routeCrossings';
 import type { Point, RegionNode, StateMachineDocument, StateNode, TransitionEdge } from '../../src/types/graph';
 
 function node(id: string, regionId: string | null = null, width = 100, height = 50): StateNode {
@@ -245,12 +245,52 @@ describe('Member B layout engine', () => {
     for (let i = 1; i < lanes.length; i++) expect(lanes[i] - lanes[i - 1]).toBeGreaterThanOrEqual(6 - 1e-8);
   });
 
-  it('accounts for a potentially crossing shared interior run when comparing layouts', () => {
-    const a = [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 60, y: 20 }, { x: 80, y: 0 }];
+  it('counts shared runs only when the paths swap sides', () => {
+    const a = [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 60, y: 20 }, { x: 80, y: 40 }];
     const b = [{ x: 0, y: 40 }, { x: 20, y: 20 }, { x: 60, y: 20 }, { x: 80, y: 0 }];
-    expect(countRouteCrossings(a, [b]).possibleContacts).toBe(1);
+    expect(countRouteCrossings(a, [b])).toBe(1);
+    expect(countRouteCrossings(a, [[...b].reverse()])).toBe(1);
+    const sameSide = [...b.slice(0, -1), { x: 80, y: 60 }];
+    expect(countRouteCrossings(a, [sameSide])).toBe(0);
     const sameSource = [{ x: 0, y: 0 }, { x: 20, y: 20 }, { x: 60, y: 40 }];
-    expect(countRouteCrossings(a, [sameSource]).possibleContacts).toBe(0);
+    expect(countRouteCrossings(a, [sameSource])).toBe(0);
+  });
+
+  it.each(['LR', 'TB'] as const)('routes two or three direct parallel edges without doubling back in %s', (direction) => {
+    const axis = direction === 'LR' ? 'x' : 'y';
+    for (const count of [2, 3]) {
+      const input = document([node('a', null, 120), node('b', null, 120)],
+        Array.from({ length: count }, (_, index) => edge(`ab${index}`, 'a', 'b')));
+      const { document: result } = computeLayout(input, { direction });
+      const [start, end] = result.nodes.map(center);
+      for (const { waypoints } of result.edges) {
+        const points = [start, ...waypoints, end];
+        for (let i = 1; i < points.length; i++) expect(points[i][axis]).toBeGreaterThan(points[i - 1][axis]);
+      }
+      if (count === 3) expect(result.edges[1].waypoints).toHaveLength(0);
+    }
+  });
+
+  it('keeps the feedback rail outside the neighbor self-loop', () => {
+    const input = document(['n0', 'n1', 'n2'].map((id) => node(id, null, 120)),
+      [edge('loop', 'n0', 'n0'), edge('12', 'n1', 'n2'), edge('02', 'n0', 'n2'), edge('20', 'n2', 'n0')]);
+    const { document: result } = computeBaselineLayout(input);
+    const loop = result.edges[0].waypoints;
+    const feedback = result.edges[3].waypoints;
+    expect(Math.min(...feedback.map((point) => point.y))).toBeLessThan(Math.min(...loop.map((point) => point.y)));
+    const start = center(result.nodes[0]);
+    const other = center(result.nodes[2]);
+    expect(countRouteCrossings([start, ...loop, start], [[other, ...feedback, start]])).toBe(0);
+  });
+
+  it('keeps the one-crossing route in P03’s unchanged-position example', () => {
+    const input = document(Array.from({ length: 7 }, (_, i) => node(`n${i}`, null, 120)),
+      [edge('32', 'n3', 'n2'), edge('02', 'n0', 'n2'), edge('31', 'n3', 'n1'), edge('42', 'n4', 'n2')]);
+    const result = computeBaselineLayout(input).document;
+    const centers = new Map(result.nodes.map((item) => [item.id, center(item)]));
+    const paths = result.edges.map((item) => [centers.get(item.source)!, ...item.waypoints, centers.get(item.target)!]);
+    const crossings = paths.reduce((total, path, index) => total + countRouteCrossings(path, paths.slice(index + 1)), 0);
+    expect(crossings).toBe(1);
   });
 
   it('handles empty and isolated graphs without changing optional data', () => {
