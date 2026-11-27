@@ -1,0 +1,53 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T064410Z-P01-c359373ac8",
+  "event_type": "change_published",
+  "group_id": "GROUP-M",
+  "person_id": "P01",
+  "created_at": "2026-11-27T06:44:10.994801Z",
+  "related_events": [],
+  "change_id": "C-P01-c2344bbeac",
+  "branch": "people/P01/model-metrics",
+  "commit": "2ce4e97dd7a4eb4cf0bfa5b774f0473686364fe9",
+  "summary": "Polish remaining demo & performance issues: refine nested-regions.json for visible crossing reduction (4->2, -50%) and compact aspect ratio (3.25), add O(1) AABB pre-rejection in metrics.ts and defer metrics while dragging for smooth 200-node drag, allow fitViewport down to 0.02 scale for huge graphs, and remove unused isStubBackend flag (84/84 tests pass)",
+  "base_commit": "d68ef13099fa9d1c3549cead6ec692fb8dfdec07",
+  "files_changed": [
+    "fixtures/nested-regions.json",
+    "src/App.tsx",
+    "src/editor/backend.ts",
+    "src/editor/geometry.ts",
+    "src/editor/presets.ts",
+    "src/editor/session.ts",
+    "src/editor/useDiagramInteraction.ts",
+    "src/index.css",
+    "src/metrics/metrics.ts",
+    "src/ui/MetricsPanel.tsx",
+    "tests/editor/geometry.test.ts",
+    "tests/editor/rendering.test.tsx",
+    "tests/editor/session.test.ts",
+    "tests/integration/endToEnd.test.ts",
+    "tests/metrics/metrics.test.ts"
+  ],
+  "interface_changes": [],
+  "tests_run": [
+    "[\"C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\pipx\\\\pipx\\\\venvs\\\\groupctl\\\\Scripts\\\\python.exe\", \"scripts/run_checks.py\"]"
+  ],
+  "known_issues": [],
+  "proposed_for_integration": true,
+  "validation": {
+    "automated_result": "pass",
+    "results": [
+      {
+        "argv": [
+          "C:\\Users\\user\\AppData\\Local\\pipx\\pipx\\venvs\\groupctl\\Scripts\\python.exe",
+          "scripts/run_checks.py"
+        ],
+        "exit_code": 0,
+        "stdout": "[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run typecheck\n\n> state-machine-diagram-layout-editor@0.1.0 typecheck\n> tsc --noEmit\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd test\n\n> state-machine-diagram-layout-editor@0.1.0 test\n> vitest run\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv3.2.7 \u001b[39m\u001b[90mC:/Users/user/AppData/Local/Temp/groupctl-test-bx2x9tdh/checkout\u001b[39m\n\n \u001b[32m✓\u001b[39m tests/model/contract.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/editor/geometry.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/model/model.test.ts \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 11\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/metrics/metrics.test.ts \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 16\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/editor/openRequests.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/layout/layout.test.ts \u001b[2m(\u001b[22m\u001b[2m22 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 26\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/editor/editorActions.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 9\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/integration/endToEnd.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 26\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/editor/rendering.test.tsx \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 17\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m tests/editor/session.test.ts \u001b[2m(\u001b[22m\u001b[2m8 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 23\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m10 passed\u001b[39m\u001b[22m\u001b[90m (10)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m84 passed\u001b[39m\u001b[22m\u001b[90m (84)\u001b[39m\n\u001b[2m   Start at \u001b[22m 14:44:00\n\u001b[2m   Duration \u001b[22m 839ms\u001b[2m (transform 715ms, setup 0ms, collect 2.12s, tests 138ms, environment 2ms, prepare 1.79s)\u001b[22m\n\n[run_checks] Running: C:\\Program Files\\nodejs\\npm.cmd run build\n\n> state-machine-diagram-layout-editor@0.1.0 build\n> tsc --noEmit && vite build\n\n\u001b[36mvite v6.4.6 \u001b[32mbuilding for production...\u001b[36m\u001b[39m\ntransforming...\n\u001b[32m✓\u001b[39m 54 modules transformed.\nrendering chunks...\ncomputing gzip size...\n\u001b[2mdist/\u001b[22m\u001b[32mindex.html                 \u001b[39m\u001b[1m\u001b[2m  0.44 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:  0.30 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[35massets/index-B1fpRr0o.css  \u001b[39m\u001b[1m\u001b[2m  3.29 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip:  1.24 kB\u001b[22m\n\u001b[2mdist/\u001b[22m\u001b[36massets/index-DhYCy-JA.js   \u001b[39m\u001b[1m\u001b[2m279.16 kB\u001b[22m\u001b[1m\u001b[22m\u001b[2m │ gzip: 89.07 kB\u001b[22m\n\u001b[32m✓ built in 618ms\u001b[39m\n",
+        "stderr": "",
+        "counts": null,
+        "evidence_state": "pass"
+      }
+    ]
+  }
+}
