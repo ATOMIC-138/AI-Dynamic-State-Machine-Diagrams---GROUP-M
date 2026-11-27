@@ -1,0 +1,24 @@
+{
+  "protocol_version": "0.1",
+  "event_id": "E-20261127T045837Z-P02-a60debec3e",
+  "event_type": "review",
+  "group_id": "GROUP-M",
+  "person_id": "P02",
+  "created_at": "2026-11-27T04:58:37.291459Z",
+  "related_events": [
+    "E-20261126T144020Z-P03-046d2ae184"
+  ],
+  "change_id": "C-P03-f474d15ee4",
+  "verdict": "accept",
+  "summary": "已重跑上一輪的兩個案例。較早開始讀取的檔案不會覆蓋最近選擇的檔案，「符合畫面」也會納入拖到節點範圍外的連線轉折點。接受此修正版。",
+  "issues": [],
+  "tests_run": [
+    "在提案的精確 commit 上執行 scripts/run_checks.py，型別檢查、30 項原有測試及建置均通過。",
+    "在獨立檢出執行 3 項複核測試，驗證舊檔案較晚讀完、新選的範例不會被過期錯誤訊息蓋過，以及原先畫面外的轉折點會被納入縮放範圍。全部通過。"
+  ],
+  "inspected_commit": "8bef313472234f19dec99e322c372c14edcd6206",
+  "evidence": [
+    "groupctl inspect C-P03-f474d15ee4 核對提案版本，並比較前一版 5bc1fc273601ae66f3cdb56522a529e9d3f5792b 與本版的原始碼差異。",
+    "本次複核使用該提案內的暫用後端。切換正式後端後仍需整合驗收，且提案已註明畫面縮放下限仍為 20%。"
+  ]
+}
